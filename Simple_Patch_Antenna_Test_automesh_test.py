@@ -24,7 +24,7 @@ from pycallgraph import PyCallGraph
 from pycallgraph.output import GraphvizOutput
 # from CSXCAD.CSPrimitives import primitives_mesh_setup
 # from CSXCAD.CSProperties import properties_mesh_setup
-from Automesher.Automesher import Automesher
+from Automesher import Automesher
 from CSXCAD.SmoothMeshLines import SmoothMeshLines
 
 ### General parameter setup

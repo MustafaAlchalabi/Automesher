@@ -501,9 +501,6 @@ class Automesher:
                             condition2_ee = [ee for ee in edge_end if x_start < ee < x_end or x_start > ee > x_end]
                             condition3 = any((x_start in (es, ee)) and (x_end in (es, ee)) for es, ee in zip(edge_start, edge_end))
                             # print('cindition1_es', condition1_es, 'condition2_ee', condition2_ee)
-                            # condition1 = x_start < edge_start < x_end
-                            # condition2 = x_start < edge_end < x_end
-                            # condition3 = (x_start in (edge_start, edge_end)) and (x_end in (edge_start, edge_end))
                             if x_in_range:
                                 break
                             else: 
