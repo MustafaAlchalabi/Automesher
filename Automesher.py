@@ -391,7 +391,8 @@ class Automesher:
                     if metal_edge_res is not None:
                         y_min = np.min([np.min(y_in_range), edge[2], edge[3]])
                         y_max = np.max([np.max(y_in_range), edge[2], edge[3]])
-                        ylines = np.linspace(y_min, y_max, 5)
+                        ylines = SmoothMeshLines([y_min, y_max], mesh_res/2)
+                        # ylines = np.linspace(y_min, y_max, 5)
                         print ('hi,hi')
                     else:
                         ylines = np.linspace(min(y_in_range),max(y_in_range),5)                   
@@ -421,7 +422,7 @@ class Automesher:
                             hint[0].extend(xlines)                            
                     if not x_in_range:
                         if metal_edge_res is not None:               
-                            xlines=SmoothMeshLines(xlines, mesh_res/2)
+                            xlines=SmoothMeshLines([min_x,max_x], mesh_res/2)
                             hint[0].extend(xlines)
                 x_in_range = []
 
@@ -446,7 +447,7 @@ class Automesher:
                     if not y_in_range:
                         print('y_in_range', y_in_range)
                         if metal_edge_res is not None:               
-                            ylines=SmoothMeshLines(ylines, mesh_res/2)
+                            ylines=SmoothMeshLines([min_y, max_y], mesh_res/2)
                             hint[1].extend(ylines)
                 y_in_range = []
                     
@@ -481,74 +482,83 @@ class Automesher:
                     hint[1].extend(n)
                     
         if metal_edge_res is not None:
-            if unique_xedges[0] <= sorted_x[0] and unique_xedges[1]-unique_xedges[0] > mesh_res:
-                hint[0].append(sorted_xedges[0][0]-mer[0])
-            if unique_xedges[-1] >= sorted_x[-1] and unique_xedges[-1]-unique_xedges[-2] > mesh_res:
-                hint[0].append(sorted_xedges[-1][0]+mer[0])
+            # if unique_xedges[0] <= sorted_x[0] and unique_xedges[1]-unique_xedges[0] > mesh_res:
+            #     hint[0].append(sorted_xedges[0][0]-mer[0])
+            # if unique_xedges[-1] >= sorted_x[-1] and unique_xedges[-1]-unique_xedges[-2] > mesh_res:
+            #     hint[0].append(sorted_xedges[-1][0]+mer[0])
             for i in range(len(unique_xedges) - 1):
                 if x_diffs[i] > mesh_res:
                     if otheredges:
                         x_in_range = []
-                        for other_edge in otheredges:
-                            x_in_range = [unique_xedges[i] for other_edge in otheredges if other_edge[0] < unique_xedges[i] < other_edge[1] or other_edge[1] < unique_xedges[i] < other_edge[0]]
-                            x_start = unique_xedges[i]
-                            x_end = unique_xedges[i + 1]
-                            edge_start = [other_edge[0] for other_edge in otheredges]
-                            edge_end = [other_edge[1] for other_edge in otheredges]
-                            condition1 = any(x_start < es < x_end or x_start > es > x_end for es in edge_start)
-                            condition1_es = [es for es in edge_start if x_start < es < x_end or x_start > es > x_end]
-                            condition2 = any(x_start < ee < x_end  or x_start > ee > x_end for ee in edge_end)
-                            condition2_ee = [ee for ee in edge_end if x_start < ee < x_end or x_start > ee > x_end]
-                            condition3 = any((x_start in (es, ee)) and (x_end in (es, ee)) for es, ee in zip(edge_start, edge_end))
-                            # print('cindition1_es', condition1_es, 'condition2_ee', condition2_ee)
-                            if x_in_range:
-                                break
-                            else: 
-                                if condition1 or condition2 or condition3:
+                        x_in_range = [unique_xedges[i] for other_edge in otheredges if other_edge[0] <= unique_xedges[i] <= other_edge[1] or other_edge[1] <= unique_xedges[i] <= other_edge[0]]
+                        x_start = unique_xedges[i]
+                        x_end = unique_xedges[i + 1]
+                        edge_start = [other_edge[0] for other_edge in otheredges]
+                        edge_end = [other_edge[1] for other_edge in otheredges]
+                        condition1 = any(x_start < es < x_end or x_start > es > x_end for es in edge_start)
+                        condition1_es = [es for es in edge_start if x_start < es < x_end or x_start > es > x_end]
+                        condition2 = any(x_start < ee < x_end  or x_start > ee > x_end for ee in edge_end)
+                        condition2_ee = [ee for ee in edge_end if x_start < ee < x_end or x_start > ee > x_end]
+                        condition3 = any((x_start in (es, ee)) and (x_end in (es, ee)) for es, ee in zip(edge_start, edge_end))
+                        # print('cindition1_es', condition1_es, 'condition2_ee', condition2_ee)
+                        if x_in_range:
+                            if condition1_es and condition2_ee:
+                                xlines = SmoothMeshLines([max(max(condition1_es), max(condition2_ee)), unique_xedges[i+1]], mesh_res) 
+                                hint[0].extend(xlines)
+                            elif condition1_es:
+                                xlines = SmoothMeshLines([max(condition1_es), unique_xedges[i+1]], mesh_res)
+                                hint[0].extend(xlines)
+                            elif condition2_ee:
+                                xlines = SmoothMeshLines([max(condition2_ee), unique_xedges[i+1]], mesh_res)
+                                # xlines = np.linspace(min(condition2_ee), unique_xedges[i], 5)
+                                hint[0].extend(xlines)
+                            print('X_in_range', x_in_range)
 
-                                    if unique_xedges[i] < condition1_es or unique_xedges[i] < condition2_ee:
-                                        if condition1_es and condition2_ee:
-                                            if any(es == ee for es in condition1_es for ee in condition2_ee):
-                                                print('hi')
-                                            else:
-                                            # print('both')
-                                                min_value = min(min(condition1_es), min(condition2_ee))
-                                                xlines = SmoothMeshLines([min_value, unique_xedges[i]], mesh_res / 4)
+                        else: 
+                            if condition1 or condition2 or condition3:
+
+                                if np.any(unique_xedges[i] < condition1_es) or np.any(unique_xedges[i] < condition2_ee):
+                                    if condition1_es and condition2_ee:
+                                        if any(es == ee for es in condition1_es for ee in condition2_ee):
+                                            print('hi')
+                                        else:
+                                        # print('both')
+                                            min_value = min(min(condition1_es), min(condition2_ee))
+                                            xlines = SmoothMeshLines([min_value, unique_xedges[i]], mesh_res)
                                             n = [x for x in xlines if unique_xedges[i] < x < min_value]
                                             hint[0].extend(n)
-                                        if condition1_es and not (condition2_ee and condition1_es):
-                                            # print('condition1_es', condition1_es)
-                                            for es in condition1_es:
-                                                xlines = SmoothMeshLines([es, unique_xedges[i]], mesh_res / 4)
-                                                n = [x for x in xlines if unique_xedges[i] < x < es]
-                                                hint[0].extend(n)
-                                        if condition2_ee and not (condition2_ee and condition1_es):
-                                            # print('condition2_ee', condition2_ee)
-                                            for ee in condition2_ee:
-                                                xlines = SmoothMeshLines([ee, unique_xedges[i]], mesh_res / 4)
-                                                n = [x for x in xlines if unique_xedges[i] < x < ee]
-                                                hint[0].extend(n)
-                                        # n = [x for x in xlines if unique_xedges[i] < x < min(min(edge_end),min(edge_start))]
-                                        hint[0].extend(n)
-                                        # print('hi')
+                                    if condition1_es and not (condition2_ee and condition1_es):
+                                        # print('condition1_es', condition1_es)
+                                        for es in condition1_es:
+                                            xlines = SmoothMeshLines([es, unique_xedges[i]], mesh_res)
+                                            n = [x for x in xlines if unique_xedges[i] < x < es]
+                                            hint[0].extend(n)
+                                    if condition2_ee and not (condition2_ee and condition1_es):
+                                        # print('condition2_ee', condition2_ee)
+                                        for ee in condition2_ee:
+                                            xlines = SmoothMeshLines([ee, unique_xedges[i]], mesh_res)
+                                            n = [x for x in xlines if unique_xedges[i] < x < ee]
+                                            hint[0].extend(n)
+                                    # print('hi')
+                                if condition1_es and condition2_ee:    
                                     if unique_xedges[i+1] > max(max(condition1_es),max(condition2_ee)):
                                         xlines=SmoothMeshLines([max(max(condition1_es),max(condition2_ee)), unique_yedges[i + 1]], mesh_res)
                                         n = [x for x in xlines if max(max(condition1_es),max(condition2_ee)) < x < unique_xedges[i + 1]]
                                         hint[0].extend(n)
-                                    else:
-                                        xlines = np.linspace(max(max(edge_end),max(edge_start)),unique_xedges[i + 1],5)
-                                        xlines=SmoothMeshLines([max(max(edge_end),max(edge_start)), unique_xedges[i + 1]], mesh_res)
-                                        n = [x for x in xlines if max(max(edge_end),max(edge_start)) < x < unique_xedges[i + 1]]
-                                        hint[0].extend(n)
-                                        print(unique_xedges[i], condition2_ee,condition1_es)
-                                        # print('hello')
-                                if not any([condition1, condition2, condition3]):
-                                # if not any(unique_xedges[i] < other_edge[0] < unique_xedges[i + 1] or unique_xedges[i] < other_edge[1] < unique_xedges[i + 1] for other_edge in otheredges):
-                                    xlines = grid.GetLines('x', do_sort=True)
-                                    xlines = SmoothMeshLines(xlines, mesh_res)
-                                    n = [x for x in xlines if unique_xedges[i] < x < unique_xedges[i + 1]]
-                                    hint[0].extend(n)
-                                    # continue
+                                else:
+                                    xlines = np.linspace(max(max(edge_end),max(edge_start)),unique_xedges[i + 1],5)
+                                    xlines=SmoothMeshLines([max(max(edge_end),max(edge_start)), unique_xedges[i + 1]], mesh_res)
+                                    n = [x for x in xlines if max(max(edge_end),max(edge_start)) < x < unique_xedges[i + 1]]
+                                    # hint[0].extend(n)
+                                    # print(unique_xedges[i], condition2_ee,condition1_es)
+                                    # print('hello')
+                            if not any([condition1, condition2, condition3]):
+                            # if not any(unique_xedges[i] < other_edge[0] < unique_xedges[i + 1] or unique_xedges[i] < other_edge[1] < unique_xedges[i + 1] for other_edge in otheredges):
+                                # xlines = grid.GetLines('x', do_sort=True)
+                                xlines = SmoothMeshLines([unique_xedges[i],unique_xedges[i+1]], mesh_res)
+                                n = [x for x in xlines if unique_xedges[i] < x < unique_xedges[i + 1]]
+                                hint[0].extend(n)
+                                # continue
 
                     else:
                         xlines = grid.GetLines('x', do_sort=True)
@@ -560,103 +570,108 @@ class Automesher:
                     continue
 
 
+            condition1_es = []
+            condition2_ee = []
 
-
-            if unique_yedges[0] <= sorted_y[0] and unique_yedges[1]-unique_yedges[0] > mesh_res:
-                hint[1].append(sorted_yedges[0][0]-mer[0])
-            if unique_yedges[-1] >= sorted_y[-1] and unique_yedges[-1]-unique_yedges[-2] > mesh_res:
-                hint[1].append(sorted_yedges[-1][0]+mer[0])
+            # if unique_yedges[0] <= sorted_y[0] and unique_yedges[1]-unique_yedges[0] > mesh_res:
+            #     hint[1].append(sorted_yedges[0][0]-mer[0])
+            # if unique_yedges[-1] >= sorted_y[-1] and unique_yedges[-1]-unique_yedges[-2] > mesh_res:
+            #     hint[1].append(sorted_yedges[-1][0]+mer[0])
             for i in range(len(unique_yedges) - 1):
                 if y_diffs[i] > mesh_res:
                     if otheredges:
                         y_in_range = []
-                        for other_edge in otheredges:
-                            y_start = unique_yedges[i]
-                            y_end = unique_yedges[i + 1]
-                            y_in_range = [unique_yedges[i] for other_edge in otheredges if other_edge[2] <= unique_yedges[i] <= other_edge[3] or other_edge[3] <= unique_yedges[i] <= other_edge[2]]
-                            # y_in_range = [y for y in unique_yedges if y_start < y < y_end or y_start > y > y_end]
-                            edge_start = [other_edge[2] for other_edge in otheredges]
-                            edge_end = [other_edge[3] for other_edge in otheredges]
-                            condition1 = any(y_start < es < y_end or y_start > es > y_end for es in edge_start)
-                            condition1_es = [es for es in edge_start if y_start < es < y_end or y_start > es > y_end]
-                            condition2 = any(y_start < ee < y_end  or y_start > ee > y_end for ee in edge_end)
-                            condition2_ee = [ee for ee in edge_end if y_start < ee < y_end or y_start > ee > y_end]
-                            condition3 = any((y_start in (es, ee)) and (y_end in (es, ee)) for es, ee in zip(edge_start, edge_end))
-                            if y_in_range:
-                                break
-                            else: 
+                        y_start = unique_yedges[i]
+                        y_end = unique_yedges[i + 1]
+                        y_in_range = [unique_yedges[i] for other_edge in otheredges if other_edge[2] <= unique_yedges[i] <= other_edge[3] or other_edge[3] <= unique_yedges[i] <= other_edge[2]]
+                        edge_start = [other_edge[2] for other_edge in otheredges]
+                        edge_end = [other_edge[3] for other_edge in otheredges]
+                        condition1 = any(y_start < es < y_end or y_start > es > y_end for es in edge_start)
+                        condition1_es = [es for es in edge_start if y_start < es < y_end or y_start > es > y_end]
+                        condition2 = any(y_start < ee < y_end  or y_start > ee > y_end for ee in edge_end)
+                        condition2_ee = [ee for ee in edge_end if y_start < ee < y_end or y_start > ee > y_end]
+                        condition3 = any((y_start in (es, ee)) and (y_end in (es, ee)) for es, ee in zip(edge_start, edge_end))
+                        if y_in_range:
+                            if condition1_es and condition2_ee:
+                                ylines = SmoothMeshLines([max(max(condition1_es), max(condition2_ee)), unique_yedges[i+1]], mesh_res)[1:-1] 
+                                hint[1].extend(ylines)
+                            # elif condition1_es:
+                            #     ylines = SmoothMeshLines([min(condition1_es, unique_yedges[i]), max(condition1_es,unique_yedges[i])], mesh_res)
+                            #     hint[1].extend(ylines)
+                            # elif condition2_ee:
+                            #     ylines = SmoothMeshLines([min(condition2_ee, unique_yedges[i]), max(condition2_ee,unique_yedges[i])], mesh_res)
+                            #     hint[1].extend(ylines)
+                            print('y_in_range', y_in_range)
 
-                                if condition1 or condition2 or condition3:
-                                    if unique_yedges[i] < condition1_es or unique_yedges[i] < condition2_ee:
-                                        # xlines=SmoothMeshLines([min(min(edge_end),min(edge_start)),unique_yedges[i]], mesh_res/2)
-                                        if condition1_es and condition2_ee:
-                                            if any(es == ee for es in condition1_es for ee in condition2_ee):
-                                                print('hi')
-                                            else:
-                                                print('both')
-                                                min_value = min(min(condition1_es), min(condition2_ee))
-                                                ylines = SmoothMeshLines([min_value, unique_yedges[i]], mesh_res / 4)
+                        elif not y_in_range: 
+                            print('y_in_range', y_in_range)
+                            print('unique_yedges[i]', unique_yedges[i])
+                            if condition1 or condition2 or condition3:
+                                if unique_yedges[i] < condition1_es or unique_yedges[i] < condition2_ee:
+                                    # print('hello')
+                                    # xlines=SmoothMeshLines([min(min(edge_end),min(edge_start)),unique_yedges[i]], mesh_res/2)
+                                    if condition1_es and condition2_ee:
+                                        if any(es == ee for es in condition1_es for ee in condition2_ee):
+                                            print('hi')
+                                        else:
+                                            print('both')
+                                            min_value = min(min(condition1_es), min(condition2_ee))
+                                            ylines = SmoothMeshLines([min_value, unique_yedges[i]], mesh_res )
                                             n = [y for y in ylines if unique_yedges[i] < y < min_value]
                                             hint[1].extend(n)
-                                        if condition1_es and not (condition2_ee and condition1_es):
-                                            # print('condition1_es', condition1_es)
-                                            for es in condition1_es:
-                                                ylines = SmoothMeshLines([es, unique_yedges[i]], mesh_res / 4)
-                                                n = [y for y in ylines if unique_yedges[i] < y < es]
-                                                hint[1].extend(n)
-                                        if condition2_ee and not (condition2_ee and condition1_es):
-                                            # print('condition2_ee', condition2_ee)
-                                            for ee in condition2_ee:
-                                                ylines = SmoothMeshLines([ee, unique_yedges[i]], mesh_res / 4)
-                                                n = [y for y in ylines if unique_yedges[i] < y < ee]
-                                                hint[1].extend(n)
-                                                # print('hi')
-                                        # n = [y for y in ylines if unique_yedges[i] < y < min(min(edge_end),min(edge_start))]
-                                        hint[1].extend(n)
-                                        # print('hi')
+                                    if condition1_es and not (condition2_ee and condition1_es):
+                                        # print('condition1_es', condition1_es)
+                                        for es in condition1_es:
+                                            ylines = SmoothMeshLines([es, unique_yedges[i]], mesh_res)
+                                            n = [y for y in ylines if unique_yedges[i] < y < es]
+                                            hint[1].extend(n)
+                                    if condition2_ee and not (condition2_ee and condition1_es):
+                                        # print('condition2_ee', condition2_ee)
+                                        for ee in condition2_ee:
+                                            ylines = SmoothMeshLines([ee, unique_yedges[i]], mesh_res)
+                                            n = [y for y in ylines if unique_yedges[i] < y < ee]
+                                            hint[1].extend(n)
+                                            # print('hi')
+                                    # n = [y for y in ylines if unique_yedges[i] < y < min(min(edge_end),min(edge_start))]
+                                    # print('hi')
+                                if condition1_es and condition2_ee:
                                     if unique_yedges[i+1] > max(max(condition1_es),max(condition2_ee)):
                                         ylines=SmoothMeshLines([max(max(condition1_es),max(condition2_ee)), unique_yedges[i + 1]], mesh_res/2)
                                         n = [y for y in ylines if max(max(condition1_es),max(condition2_ee)) < y < unique_yedges[i + 1]]
                                         hint[1].extend(n)
                                         # print('hello')
-                                    else:
-                                        ylines = np.linspace(max(max(edge_end),max(edge_start)),unique_yedges[i + 1],5)
-                                        ylines=SmoothMeshLines([max(max(edge_end),max(edge_start)), unique_yedges[i + 1]], mesh_res)
-                                        n = [y for y in ylines if max(max(edge_end),max(edge_start)) < y < unique_yedges[i + 1]]
-                                        hint[1].extend(n)
-                                        print(unique_yedges[i], condition2_ee,condition1_es)
-                                        # print('hello')
-                                if not any([condition1, condition2, condition3]):
-                                    ylines = grid.GetLines('y', do_sort=True)
-                                    ylines = SmoothMeshLines(ylines, mesh_res/2)
-                                    n = [y for y in ylines if unique_yedges[i] < y < unique_yedges[i + 1]]
-                                    hint[1].extend(n)
-                                    # print('hi')
-                                    # continue
+                                else:
+                                    ylines = np.linspace(max(max(edge_end),max(edge_start)),unique_yedges[i + 1],5)
+                                    ylines=SmoothMeshLines([max(max(edge_end),max(edge_start)), unique_yedges[i + 1]], mesh_res)
+                                    # hint[1].extend(ylines)
+                                # print('hello')
+                                # print(unique_yedges[i], condition2_ee,condition1_es)
+                            if not any([condition1, condition2, condition3]):
+                                # ylines = grid.GetLines('y', do_sort=True)
+                                ylines = SmoothMeshLines([unique_yedges[i],unique_yedges[i+1]], mesh_res)
+                                n = [y for y in ylines if unique_yedges[i] < y < unique_yedges[i + 1]]
+                                hint[1].extend(n)
+                                # print('hi')
+                                # continue
 
                     else:
                         ylines = grid.GetLines('y', do_sort=True)
                         ylines=SmoothMeshLines(ylines, mesh_res)
                         n = [y for y in ylines if unique_yedges[i] < y < unique_yedges[i + 1]]
                         hint[1].extend(n)   
+                        # print('hello')
                         continue 
                 else:
                     print('hello')
                     continue
-
-            if unique_xedges[0] <= sorted_x[0]:
-                hint[0].append(unique_xedges[0]-2*abs(unique_xedges[0]-min(hint[0])))
-            if unique_xedges[-1] >= sorted_x[-1]:
-                hint[0].append(unique_xedges[-1]+2*abs(unique_xedges[-1]-max(hint[0])))
-            if unique_yedges[0] <= sorted_y[0]:
-                hint[1].append(unique_yedges[0]-2*abs(unique_yedges[0]-min(hint[1])))
-            if unique_yedges[-1] >= sorted_y[-1]:
-                hint[1].append(unique_yedges[-1]+2*abs(unique_yedges[-1]-max(hint[1])))
             
             if unique_xedges[-1] < sorted_x[-1]:
                 for other_edge in otheredges:
                     if other_edge[0] <= sorted_x[-1] <= other_edge[1] or other_edge[1] <= sorted_x[-1] <= other_edge[0]:
-                        xlines = SmoothMeshLines([unique_xedges[-1], min(other_edge[0],other_edge[1])], mesh_res)
+                        if abs(np.diff([unique_xedges[-1],min(other_edge[0],other_edge[1])])) < mesh_res:
+                            xlines = np.linspace(unique_xedges[-1], min(other_edge[0],other_edge[1]), 5)[1:]
+                        else:
+                            xlines = SmoothMeshLines([unique_xedges[-1], min(other_edge[0],other_edge[1])], mesh_res)[1:]
                         hint[0].extend(xlines)
             if unique_xedges[0] > sorted_x[0]:
                 for other_edge in otheredges:
@@ -666,15 +681,89 @@ class Automesher:
                         else:
                             xlines = SmoothMeshLines([max(other_edge[0],other_edge[1]), unique_xedges[0]], mesh_res)
                         hint[0].extend(xlines)
-                        
+            if unique_yedges[-1] < sorted_y[-1]:
+                for other_edge in otheredges:
+                    if other_edge[2] <= sorted_y[-1] <= other_edge[3] or other_edge[3] <= sorted_y[-1] <= other_edge[2]:
+                        if abs(np.diff([unique_yedges[-1],min(other_edge[2],other_edge[3])])) < mesh_res:
+                            ylines = np.linspace(unique_yedges[-1], min(other_edge[2],other_edge[3]), 5)[1:]
+                        else:
+                            ylines = SmoothMeshLines([unique_yedges[-1], min(other_edge[2],other_edge[3])], mesh_res)[1:]
+                        hint[1].extend(ylines)
+            if unique_yedges[0] > sorted_y[0]:
+                # print('hi')
+                for other_edge in otheredges:
+                    if other_edge[2] <= sorted_y[0] <= other_edge[3] or other_edge[3] <= sorted_y[0] <= other_edge[2]:
+                        if abs(np.diff([unique_yedges[0],max(other_edge[2],other_edge[3])])) < mesh_res:
+                            ylines = np.linspace(unique_yedges[0], max(other_edge[2],other_edge[3]), 5)[1:]
+                        else:
+                            ylines = SmoothMeshLines([max(other_edge[2],other_edge[3]), unique_yedges[0]], mesh_res)
+                        hint[1].extend(ylines)
 
+
+        if metal_edge_res is not None:
+            if unique_xedges[0] <= sorted_x[0]:
+                hint_in_range =  [hint for hint in hint[0] if unique_xedges[0]-mer[1] <= hint <= unique_xedges[0]-mer[0]]
+                if not hint_in_range:
+                    hint[0].append(unique_xedges[0]-mer[1])
+                    hint[0].append(unique_xedges[0]-mer[0])
+                else:
+                    hint[0] = [h for h in hint[0] if h not in hint_in_range]
+                    hint[0].append(unique_xedges[0]-mer[1])
+                    hint[0].append(unique_xedges[0]-mer[0])
+            if unique_xedges[-1] >= sorted_x[-1]:
+                hint_in_range =  [hint for hint in hint[0] if unique_xedges[-1]+mer[0] <= hint <= unique_xedges[-1]+mer[1]]
+                if not hint_in_range:
+                    hint[0].append(unique_xedges[-1]+mer[0])
+                    hint[0].append(unique_xedges[-1]+mer[1])
+                else:
+                    hint[0] = [h for h in hint[0] if h not in hint_in_range]
+                    hint[0].append(unique_xedges[-1]+mer[0])
+                    hint[0].append(unique_xedges[-1]+mer[1])
+            if unique_yedges[0] <= sorted_y[0]:
+                hint_in_range =  [hint for hint in hint[1] if unique_yedges[0]-mer[1] <= hint <= unique_yedges[0]-mer[0]]
+                if not hint_in_range:
+                    hint[1].append(unique_yedges[0]-mer[1])
+                    hint[1].append(unique_yedges[0]-mer[0])
+                else:
+                    hint[1] = [h for h in hint[1] if h not in hint_in_range]
+                    hint[1].append(unique_yedges[0]-mer[1])
+                    hint[1].append(unique_yedges[0]-mer[0])
+            if unique_yedges[-1] >= sorted_y[-1]:
+                hint_in_range =  [hint for hint in hint[1] if unique_yedges[-1]+mer[0] <= hint <= unique_yedges[-1]+mer[1]]
+                if not hint_in_range:
+                    hint[1].append(unique_yedges[-1]+mer[0])
+                    hint[1].append(unique_yedges[-1]+mer[1])
+                else:
+                    hint[1] = [h for h in hint[1] if h not in hint_in_range]
+                    hint[1].append(unique_yedges[-1]+mer[0])
+                    hint[1].append(unique_yedges[-1]+mer[1])
+
+                      # if unique_xedges[0] <= sorted_x[0] and unique_xedges[1]-unique_xedges[0] > mesh_res:
+            #     hint[0].append(sorted_xedges[0][0]-mer[0])
+            # if unique_xedges[-1] >= sorted_x[-1] and unique_xedges[-1]-unique_xedges[-2] > mesh_res:
+            #     hint[0].append(sorted_xedges[-1][0]+mer[0])      
+                   
+            # if unique_yedges[0] <= sorted_y[0] and unique_yedges[1]-unique_yedges[0] > mesh_res:
+            #     hint[1].append(sorted_yedges[0][0]-mer[0])
+            # if unique_yedges[-1] >= sorted_y[-1] and unique_yedges[-1]-unique_yedges[-2] > mesh_res:
+            #     hint[1].append(sorted_yedges[-1][0]+mer[0])     
+
+            # if unique_xedges[0] <= sorted_x[0]:
+            #     hint[0].append(unique_xedges[0]-2*abs(unique_xedges[0]-min(hint[0])))
+            # if unique_xedges[-1] >= sorted_x[-1]:
+            #     hint[0].append(unique_xedges[-1]+2*abs(unique_xedges[-1]-max(hint[0])))
+            # if unique_yedges[0] <= sorted_y[0]:
+            #     hint[1].append(unique_yedges[0]-2*abs(unique_yedges[0]-min(hint[1])))
+            # if unique_yedges[-1] >= sorted_y[-1]:
+            #     hint[1].append(unique_yedges[-1]+2*abs(unique_yedges[-1]-max(hint[1])))
         realhint = [None,None,None]
         if dirs is not None:
             for ny in GetMultiDirs(dirs):
                 realhint[ny] = hint[ny]
         if 'mesh' in kw:
             return self.mesh_combine(hint, kw['mesh'])
-        # realhint[0] = SmoothMeshLines(hint[0], mesh_res)    
+        realhint[0] = SmoothMeshLines(hint[0], mesh_res)    
+        realhint[1] = SmoothMeshLines(hint[1], mesh_res)
         return (realhint,dirs,metal_edge_res)
     
     def mesh_estimate_cfl_timestep(self, mesh):
