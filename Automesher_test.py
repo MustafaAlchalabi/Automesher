@@ -55,7 +55,7 @@ feed_pos = -6 #feeding position in x-direction
 feed_R = 50     #feed resistance
 
 # size of the simulation box
-SimBox = np.array([150, 150, 100])
+SimBox = np.array([150, 150, 100])*2
 
 # setup FDTD parameter & excitation function
 f0 = 200e6 # center frequency
@@ -74,7 +74,7 @@ CSX = ContinuousStructure()
 FDTD.SetCSX(CSX)
 mesh = CSX.GetGrid()
 mesh.SetDeltaUnit(1e-3)
-mesh_res = C0/(f0+fc)/1e-3/40
+mesh_res = C0/(f0+fc)/1e-3/25
 # mesh_res=int(1)
 
 global_mesh_setup = {
@@ -150,14 +150,15 @@ y = [-64/2, -64/2, 64/2, 64/2, -64/2+5,-64/2+5, 64/2-5, 64/2-5, 2.5,  2.5,  64/2
 # Define the outer polygon (rectangle)
 # x = [patch_width/2, patch_width/2, -patch_width/2, -patch_width/2, patch_width/2]
 # y = [substrate_length/2 - delta, substrate_length/2 - patch_length - delta, substrate_length/2 - patch_length - delta, substrate_length/2 - delta, substrate_length/2 - delta]
-
+x = [i *2 for i in x]
+y = [i *2 for i in y]
 # gap = 6
 # x= [-10,  0, 0, -3,  3, gap,  gap, 10,  10, -10, -10]
 # y= [10 , 10, 5, -5, -5,   5,   10, 10, -10, -10, 10]
 points = [x,y]
 mesh_hint = {
 
-     'metal_edge_res': mesh_res/2, 'dirs': 'xy'
+     'metal_edge_res': None, 'dirs': 'xy'
 }
 polygon1 = patch.AddPolygon(points, 'z', elevation = substrate_thickness, priority = 1000)
 primitives_mesh_setup[polygon1] = mesh_hint
