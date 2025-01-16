@@ -55,7 +55,7 @@ feed_pos = -6 #feeding position in x-direction
 feed_R = 50     #feed resistance
 
 # size of the simulation box
-SimBox = np.array([150, 150, 100])
+SimBox = np.array([150, 150, 100])*2
 
 # setup FDTD parameter & excitation function
 f0 = 200e6 # center frequency
@@ -74,7 +74,7 @@ CSX = ContinuousStructure()
 FDTD.SetCSX(CSX)
 mesh = CSX.GetGrid()
 mesh.SetDeltaUnit(1e-3)
-mesh_res = C0/(f0+fc)/1e-3/40
+mesh_res = C0/(f0+fc)/1e-3/20
 # mesh_res=int(1)
 
 global_mesh_setup = {
@@ -140,7 +140,7 @@ stop  = [msl_width/2 + msl_width, substrate_length/2-patch_length-delta+ls, subs
 x = [patch_width/2           , patch_width/2                        , msl_width/2+msl_width                , msl_width/2+msl_width                   , msl_width/2                             , msl_width/2                                        , -msl_width/2                                       , -msl_width/2                            , -msl_width/2-msl_width                  , -msl_width/2-msl_width               , -patch_width/2                       ,  -patch_width/2           , patch_width/8            , patch_width/8                           , -patch_width/8                          , -patch_width/8                                        , patch_width/8                                        , patch_width/8            , patch_width/2]
 y = [substrate_length/2-delta , substrate_length/2-patch_length-delta, substrate_length/2-patch_length-delta, substrate_length/2-patch_length-delta+ls, substrate_length/2-patch_length-delta+ls, substrate_length/2-patch_length-delta+ls-msl_length, substrate_length/2-patch_length-delta+ls-msl_length, substrate_length/2-patch_length-delta+ls, substrate_length/2-patch_length-delta+ls, substrate_length/2-patch_length-delta, substrate_length/2-patch_length-delta,  substrate_length/2 -delta, substrate_length/2 -delta, substrate_length/2 -delta-patch_length/3, substrate_length/2 -delta-patch_length/3,  substrate_length/2 -delta-patch_length+patch_length/3, substrate_length/2 -delta-patch_length+patch_length/3, substrate_length/2 -delta, substrate_length/2 -delta]
 
-x = [85/2 , -85/2,-85/2, 85/2, 85/2, 85/2-5, 85/2-5, 85/2-10,   85/2-10,   -85/2+10, -85/2+10, -85/2+5, -85/2+5, -85/2+10,   -85/2+10,   85/2-10, 85/2-10, 85/2, 85/2]
+x = [85/2 , -85/2,-85/2-5, 85/2, 85/2, 85/2-5, 85/2-5, 85/2-10,   85/2-10,   -85/2+10, -85/2+10, -85/2+5, -85/2+5, -85/2+10,   -85/2+10,   85/2-10, 85/2-10, 85/2, 85/2]
 y = [-64/2, -64/2, 64/2, 64/2, -64/2+5,-64/2+5, 64/2-5, 64/2-5, 2.5,  2.5,  64/2-5,  64/2-5, -64/2+5, -64/2+5, -2.5,-2.5,-64/2+5, -64/2+5,-64/2]
 # x = [patch_width/2            , patch_width/2                        , msl_width/2+msl_width                , msl_width/    2+msl_width               , msl_width/2                             , msl_width/2                                        , -msl_width/2                                       , -msl_width/2                            , -msl_width/2-msl_width                  , -msl_width/2-msl_width               , -patch_width/2                       ,  -patch_width/2           , 0                        ,0                                        ,-patch_width/8]  
 # y = [substrate_length/2 -delta, substrate_length/2-patch_length-delta, substrate_length/2-patch_length-delta, substrate_length/2-patch_length-delta+ls, substrate_length/2-patch_length-delta+ls, substrate_length/2-patch_length-delta+ls-msl_length, substrate_length/2-patch_length-delta+ls-msl_length, substrate_length/2-patch_length-delta+ls, substrate_length/2-patch_length-delta+ls, substrate_length/2-patch_length-delta, substrate_length/2-patch_length-delta,  substrate_length/2 -delta, substrate_length/2 -delta, substrate_length/2 -delta-patch_length/3, substrate_length/2 -delta-patch_length/3]
@@ -150,7 +150,8 @@ y = [-64/2, -64/2, 64/2, 64/2, -64/2+5,-64/2+5, 64/2-5, 64/2-5, 2.5,  2.5,  64/2
 # Define the outer polygon (rectangle)
 # x = [patch_width/2, patch_width/2, -patch_width/2, -patch_width/2, patch_width/2]
 # y = [substrate_length/2 - delta, substrate_length/2 - patch_length - delta, substrate_length/2 - patch_length - delta, substrate_length/2 - delta, substrate_length/2 - delta]
-
+x = [i *2 for i in x]
+y = [i *2 for i in y]
 # gap = 6
 # x= [-10,  0, 0, -3,  3, gap,  gap, 10,  10, -10, -10]
 # y= [10 , 10, 5, -5, -5,   5,   10, 10, -10, -10, 10]

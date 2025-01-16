@@ -137,7 +137,7 @@ stop  = [msl_width/2 + msl_width, substrate_length/2-patch_length-delta+ls, subs
 # air1.AddBox(priority=0, start=start, stop=stop) 
 
 #  create patch with polygon
-x = [patch_width/2            , patch_width/2                        , msl_width/2+msl_width                , msl_width/2+msl_width                   , msl_width/2                             , msl_width/2                                        , -msl_width/2                                       , -msl_width/2                            , -msl_width/2-msl_width                  , -msl_width/2-msl_width               , -patch_width/2                       ,  -patch_width/2           , patch_width/8            , patch_width/8                           , -patch_width/8                          , -patch_width/8                                        , patch_width/8                                        , patch_width/8            , patch_width/2]
+x = [patch_width/2            , patch_width/2                        , msl_width/2+msl_width                , msl_width/2+msl_width                   , msl_width/2                             , msl_width/2                                        , -msl_width/2                                       , -msl_width/2                            , -msl_width/2-msl_width                  , -msl_width/2-msl_width               , -patch_width/2                       ,  -patch_width/2           , msl_width/2+msl_width    , msl_width/2+msl_width                   , -msl_width/2-msl_width                  , -msl_width/2-msl_width                                , msl_width/2+msl_width                                , msl_width/2+msl_width    , patch_width/2]
 y = [substrate_length/2-delta , substrate_length/2-patch_length-delta, substrate_length/2-patch_length-delta, substrate_length/2-patch_length-delta+ls, substrate_length/2-patch_length-delta+ls, substrate_length/2-patch_length-delta+ls-msl_length, substrate_length/2-patch_length-delta+ls-msl_length, substrate_length/2-patch_length-delta+ls, substrate_length/2-patch_length-delta+ls, substrate_length/2-patch_length-delta, substrate_length/2-patch_length-delta,  substrate_length/2 -delta, substrate_length/2 -delta, substrate_length/2 -delta-patch_length/3, substrate_length/2 -delta-patch_length/3,  substrate_length/2 -delta-patch_length+patch_length/3, substrate_length/2 -delta-patch_length+patch_length/3, substrate_length/2 -delta, substrate_length/2 -delta]
 
 # x = [10 , -10,-10, 10, 10, 8, 8, 7,   7,   -7, -7, -8, -8, -7,   -7,   7, 7, 10, 10]
@@ -151,15 +151,19 @@ y = [substrate_length/2-delta , substrate_length/2-patch_length-delta, substrate
 # x = [patch_width/2, patch_width/2, -patch_width/2, -patch_width/2, patch_width/2]
 # y = [substrate_length/2 - delta, substrate_length/2 - patch_length - delta, substrate_length/2 - patch_length - delta, substrate_length/2 - delta, substrate_length/2 - delta]
 
-# gap = 6
-# x= [-10,  -0, -0, -7,  -4, gap,  gap, 10,  10, -10, -10]
-# y= [10 , 10, -1, -5, -5,   -1,   10, 10, -10, -10, 10]
-x =[-5,-5,0,5,5,-2,-2,-5]
-y =[-5,1,5,5,2,2,-5,-5]
-x = [i * 2 for i in x]
-y = [i * 2 for i in y]
+gap = 12
+x= [-20,  -0, -0, -14,  -8, gap,  gap, 20,  20, -20, -20]
+y= [20 , 20, -2, -10, -10,   -2,   20, 20, -20, -20, 20]
+# x= [-20,  -0, -0, -14, -14, -8,-8, gap,  gap, 20,  20, -20, -20]
+# y= [20 ,  20, -2, -10, -16, -16,-10,  -2,   20, 20, -20, -20, 20]
+
+# x =[-20,-20,0,20,20,-8,-8,-20]
+# y =[-20,4,20,20,8,8,-20,-20]
+
 # x = [-10,-10,-5,5,10,10,5,-5,-10]
 # y = [-10,-6, -6,10,10,6,6,-10,-10]
+# x = [i *-1 for i in x]
+# y = [i *1 for i in y]
 points = [x,y]
 mesh_hint = {
 
