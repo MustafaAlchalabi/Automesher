@@ -397,7 +397,7 @@ class Automesher:
                     print(alpha)
                     print(np.rad2deg(alpha))
                     resolution = mesh_res * np.sin(alpha)                          
-                    ylines=SmoothMeshLines([min_y, max_y], resolution/2)
+                    ylines=SmoothMeshLines([min_y, max_y], resolution)
                     hint[1].extend(ylines)
                 y_in_range = []
                     
