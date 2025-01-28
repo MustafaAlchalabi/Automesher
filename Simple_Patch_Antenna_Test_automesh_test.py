@@ -167,7 +167,7 @@ y= [20 , 20, -2, -10, -10,   -2,   20, 20, -20, -20, 20]
 points = [x,y]
 mesh_hint = {
 
-     'metal_edge_res': mesh_res/2, 'dirs': 'xy'
+     'metal_edge_res': None, 'dirs': 'xy'
 }
 polygon1 = patch.AddPolygon(points, 'z', elevation = substrate_thickness, priority = 1000)
 primitives_mesh_setup[polygon1] = mesh_hint
