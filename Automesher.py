@@ -46,45 +46,44 @@ class Automesher:
         """
         csx = CSX
         unique_primitives = list(self.primitives_mesh_setup.keys())
-        # # print(unique_primitives)
         unique_properties = list(self.properties_mesh_setup.keys())
-        # print(unique_properties)
-        # print(self.primitives_mesh_setup)
         
-
         if csx is None:
             raise Exception('Unable to access CSX!')
         
         grid = csx.GetGrid()
-        processed_pairs = set()
         combined_primitive = []
+        diffed_primitives = []
         for i, prim in enumerate(unique_primitives):
             if len(unique_primitives) == 1:
                 self.collect_mesh_data(prim, grid, **kw)
                 continue
-            for other_prim in unique_primitives[i+1:]:
-                if (prim, other_prim) in processed_pairs or (other_prim, prim) in processed_pairs:
-                    continue
-                processed_pairs.add((prim, other_prim))
-                if prim.GetProperty() == other_prim.GetProperty():
-                    # combined_primitive = (prim, other_prim)
-                    combined_primitive.append(prim)
-                    combined_primitive.append(other_prim)
-                    # self.collect_mesh_data_for_multiple_primitives(combined_primitive, grid, **kw)
-                else:
-                    self.collect_mesh_data(prim, grid, **kw)
-                    self.collect_mesh_data(other_prim, grid, **kw)
+            else:
+                for other_prim in unique_primitives[i+1:]:
+                    if prim.GetProperty() == other_prim.GetProperty():
+                        combined_primitive.append(prim)
+                        combined_primitive.append(other_prim)
+
+        diffed_primitives = [prim for prim in unique_primitives if prim not in combined_primitive]
+        for prim in diffed_primitives:
+            print('diffed')
+            self.collect_mesh_data(prim, grid, **kw)
+
         combined_primitive = list(set(combined_primitive))
-        if combined_primitive:
-            self.collect_mesh_data_for_multiple_primitives(combined_primitive, grid, **kw)
-            # hint = self.mesh_hint_from_primitive(prim, **kw)
-            # if hint is None:
-            #     continue
-            # for n in range(3):
-            #     if hint[n] is None:
-            #         continue
-            #     grid.AddLine(n, hint[n])
-        self.filter_mesh_data()
+        combined_primitive_by_property = {}
+        for prim in combined_primitive:
+            prop = prim.GetProperty()
+            if prop not in combined_primitive_by_property:
+                combined_primitive_by_property[prop] = []
+                combined_primitive_by_property[prop].append(prim)
+            else:
+                combined_primitive_by_property[prop].append(prim)
+        
+        for prop, primitives in combined_primitive_by_property.items():
+            print(primitives)
+            self.collect_mesh_data_for_multiple_primitives(primitives, grid, **kw)
+
+        # self.filter_mesh_data()
         self.create_mesh_lines(grid)
 
     def collect_mesh_data_for_multiple_primitives(self, primitives, grid, **kw):
@@ -267,8 +266,6 @@ class Automesher:
         mesh_res = self.global_mesh_setup.get('mesh_resolution', None)
         mer = np.array([-1.0, 2.0]) / 3 * metal_edge_res if metal_edge_res else 0
 
-        # min_distance_x = self.calc_min_distance(x)
-        # min_distance_y = self.calc_min_distance(y)
         xedges, yedges = [], []
 
         if dirs is not None:
@@ -286,18 +283,19 @@ class Automesher:
 
         sorted_x = np.sort(x) 
         sorted_y = np.sort(y)
+
         self.handle_otheredges(otheredges, unique_xedges, unique_yedges, mesh_res, hint[0], 'x')
         self.handle_otheredges(otheredges, unique_xedges, unique_yedges, mesh_res, hint[1], 'y')
 
         self.mesh_tight_areas(unique_xedges, mesh_res, hint, 'x')
         self.mesh_tight_areas(unique_yedges, mesh_res, hint, 'y')
         
-        self.mesh_boundaries(unique_xedges, sorted_x, otheredges, mesh_res, hint[0], 'x')
-        self.mesh_boundaries(unique_yedges, sorted_y, otheredges, mesh_res, hint[1], 'y')
+        self.add_missing_mesh_lines(unique_xedges, sorted_x, otheredges, mesh_res, hint[0], 'x')
+        self.add_missing_mesh_lines(unique_yedges, sorted_y, otheredges, mesh_res, hint[1], 'y')
 
-        hint[0].extend(unique_xedges)
-        hint[1].extend(unique_yedges)
-
+        self.add_edges_to_mesh_hint(hint[0], unique_xedges)
+        self.add_edges_to_mesh_hint(hint[1], unique_yedges)
+        
         if isinstance(polygon, list):
             coords = [prim.GetCoords() for prim in polygon]
             x = np.concatenate([coord[0] for coord in coords])
@@ -306,100 +304,9 @@ class Automesher:
             x = polygon.GetCoords()[0]
             y = polygon.GetCoords()[1]     
 
-        # def metal_edge(edges, polygon, mesh_res, hint, dirs, metal_edge_res, direction):
-        #     if isinstance(polygon, list):
-        #         coords = [prim.GetCoords() for prim in polygon]
-        #         x = np.concatenate([coord[0] for coord in coords])
-        #         y = np.concatenate([coord[1] for coord in coords])
-        #     else:
-        #         x = polygon.GetCoords()[0]
-        #         y = polygon.GetCoords()[1] 
-        #     mer = np.array([-1.0, 2.0]) / 3 * metal_edge_res if metal_edge_res else 0
-        #     if direction == 'x':
-        #         min_distance_x = self.calc_min_distance(x)
-        #     if direction == 'y':
-        #         min_distance_y = self.calc_min_distance(y)
-        #     if dirs is not None:
-        #         for i in range(len(edges) - 1):
-        #             if direction == 'x':
-        #                 condition1 = self.yline_in_polygon(coords, edges[i][0]+min_distance_x/2, edges[i][1], edges[i][2]) and not self.yline_in_polygon(coords, edges[i][0]-min_distance_x/2, edges[i][1], edges[i][2])
-        #                 condition2 = self.yline_in_polygon(coords, edges[i][0]-min_distance_x/2, edges[i][1], edges[i][2]) and self.yline_in_polygon(coords, edges[i][0]+min_distance_x/2, edges[i][1], edges[i][2])
-        #             if direction == 'y':
-        #                 condition1 = self.xline_in_polygon(coords, edges[i][1], edges[i][2], edges[i][0]+min_distance_y/2) and not self.xline_in_polygon(coords, edges[i][1], edges[i][2], edges[i][0]-min_distance_y/2)
-        #                 condition2 = self.xline_in_polygon(coords, edges[i][1], edges[i][2], edges[i][0]-min_distance_y/2) and self.xline_in_polygon(coords, edges[i][1], edges[i][2], edges[i][0]+min_distance_y/2)
-        #             if metal_edge_res is not None:
-        #                 if i > 0 and abs(edges[i][0] - edges[i + 1][0]) > mesh_res and abs(edges[i][0] - edges[i - 1][0]) > mesh_res:
-        #                     if condition1:
-        #                         hint_in_range =  [hint for hint in hint if edges[i][0]-mer[1] <= hint <= edges[i][0]-mer[0]]
-        #                         if not hint_in_range:
-        #                             hint.append(edges[i][0]-mer[1])
-        #                             hint.append(edges[i][0]-mer[0])
-        #                         else:
-        #                             hint = [h for h in hint if h not in hint_in_range]
-        #                             hint.append(edges[i][0]-mer[1])
-        #                             hint.append(edges[i][0]-mer[0])
-        #                     elif condition2:
-        #                         continue
-        #                     else:
-        #                         hint_in_range =  [hint for hint in hint if edges[i][0]+mer[0] <= hint <= edges[i][0]+mer[1]]
-        #                         if not hint_in_range:
-        #                             hint.append(edges[i][0]+mer[0])
-        #                             hint.append(edges[i][0]+mer[1])
-        #                         else:
-        #                             hint = [h for h in hint if h not in hint_in_range]
-        #                             hint.append(edges[i][0]+mer[0])
-        #                             hint.append(edges[i][0]+mer[1])
+        # self.metal_edge(xedges, polygon, mesh_res, hint[0], dirs, metal_edge_res, 'x')
+        # self.metal_edge(yedges, polygon, mesh_res, hint[1], dirs, metal_edge_res, 'y')
     
-        # metal_edge(xedges, polygon, mesh_res, hint[0], dirs, metal_edge_res, 'x')
-        # metal_edge(yedges, polygon, mesh_res, hint[1], dirs, metal_edge_res, 'y')
-    
-        # if dirs is not None:
-        #             for i in range(len(xedges)-1):
-        #                 if metal_edge_res is not None:
-        #                     if i > 0 and abs(xedges[i][0] - xedges[i + 1][0]) > mesh_res and abs(xedges[i][0] - xedges[i - 1][0]) > mesh_res:
-        #                         if self.yline_in_polygon(polygon.GetCoords(), xedges[i][0]+min_distance_x/2, xedges[i][1], xedges[i][2]) and not self.yline_in_polygon(polygon.GetCoords(), xedges[i][0]-min_distance_x/2, xedges[i][1], xedges[i][2]):
-        #                             hint_in_range =  [hint for hint in hint[0] if xedges[i][0]-mer[1] <= hint <= xedges[i][0]-mer[0]]
-        #                             if not hint_in_range:
-        #                                 hint[0].append(xedges[i][0]-mer[1])
-        #                                 hint[0].append(xedges[i][0]-mer[0])
-        #                             else:
-        #                                 hint[0] = [h for h in hint[0] if h not in hint_in_range]
-        #                                 hint[0].append(xedges[i][0]-mer[1])
-        #                                 hint[0].append(xedges[i][0]-mer[0])
-        #                         elif self.yline_in_polygon(polygon.GetCoords(), xedges[i][0]-min_distance_x/2, xedges[i][1], xedges[i][2]) and self.yline_in_polygon(polygon.GetCoords(), xedges[i][0]+min_distance_x/2, xedges[i][1], xedges[i][2]):
-        #                             continue
-        #                         else:
-        #                             hint_in_range =  [hint for hint in hint[0] if xedges[i][0]+mer[0] <= hint <= xedges[i][0]+mer[1]]
-        #                             if not hint_in_range:
-        #                                 hint[0].append(xedges[i][0]+mer[0])
-        #                                 hint[0].append(xedges[i][0]+mer[1])
-        #                             else:
-        #                                 hint[0] = [h for h in hint[0] if h not in hint_in_range]
-        #                                 hint[0].append(xedges[i][0]+mer[0])
-        #                                 hint[0].append(xedges[i][0]+mer[1])
-        #             for i in range(len(yedges)-1):
-        #                     if metal_edge_res is not None:
-        #                         if i > 0 and abs(yedges[i][0] - yedges[i + 1][0]) > mesh_res and abs(yedges[i][0] - yedges[i - 1][0]) > mesh_res:
-        #                             if self.xline_in_polygon(polygon.GetCoords(), yedges[i][1], yedges[i][2], yedges[i][0]+min_distance_y/2) and not self.xline_in_polygon(polygon.GetCoords(), yedges[i][1], yedges[i][2], yedges[i][0]-min_distance_y/2):
-        #                                 hint_in_range =  [hint for hint in hint[1] if yedges[i][0]-mer[1] <= hint <= yedges[i][0]-mer[0]]
-        #                                 if not hint_in_range:
-        #                                     hint[1].append(yedges[i][0]-mer[1])
-        #                                     hint[1].append(yedges[i][0]-mer[0])
-        #                                 else:
-        #                                     hint[1] = [h for h in hint[1] if h not in hint_in_range]
-        #                                     hint[1].append(yedges[i][0]-mer[1])
-        #                                     hint[1].append(yedges[i][0]-mer[0])
-        #                             elif self.xline_in_polygon(polygon.GetCoords(), yedges[i][1], yedges[i][2], yedges[i][0]+min_distance_y/2) and self.xline_in_polygon(polygon.GetCoords(), yedges[i][1], yedges[i][2], yedges[i][0]-min_distance_y/2):
-        #                                 continue
-        #                             else:
-        #                                 hint_in_range =  [hint for hint in hint[1] if yedges[i][0]+mer[0] <= hint <= yedges[i][0]+mer[1]]
-        #                                 if not hint_in_range:
-        #                                     hint[1].append(yedges[i][0]+mer[0])
-        #                                     hint[1].append(yedges[i][0]+mer[1])
-        #                                 else:
-        #                                     hint[1] = [h for h in hint[1] if h not in hint_in_range]
-        #                                     hint[1].append(yedges[i][0]+mer[0])
-        #                                     hint[1].append(yedges[i][0]+mer[1])
         if metal_edge_res is not None:
             if unique_xedges[0] <= sorted_x[0]:
                 hint_in_range =  [hint for hint in hint[0] if unique_xedges[0]-mer[1] <= hint <= unique_xedges[0]-mer[0]]
@@ -438,11 +345,11 @@ class Automesher:
                     hint[1].append(unique_yedges[-1]+mer[0])
                     hint[1].append(unique_yedges[-1]+mer[1])
       
-        hint[0] = SmoothMeshLines(hint[0], mesh_res)    
-        hint[1] = SmoothMeshLines(hint[1], mesh_res)
+        # hint[0] = SmoothMeshLines(hint[0], mesh_res)    
+        # hint[1] = SmoothMeshLines(hint[1], mesh_res)
 
-        hint[0] = hint[0].tolist()
-        hint[1] = hint[1].tolist()
+        # hint[0] = hint[0].tolist()
+        # hint[1] = hint[1].tolist()
 
         for i in range(len(hint[0])-1):
             if abs(hint[0][i] - hint[0][i+1]) <= mesh_res/20:
@@ -575,6 +482,20 @@ class Automesher:
                         hint.remove(line)
                     hint.extend(SmoothMeshLines([np.min(coords_of_p), np.max(coords_of_p)], resolution/2))
 
+    def add_edges_to_mesh_hint(self, hint, unique_edges):
+        if len(hint) > 1:
+            min_distance = self.calc_min_distance(hint)
+            for edge in unique_edges:
+                hint_in_range = [hint for hint in hint if edge - min_distance <= hint <= edge + min_distance]
+                if hint_in_range:
+                    for h in hint_in_range:
+                        hint.remove(h)
+                    hint.append(edge)
+                else:
+                    hint.append(edge)
+        else :
+            hint.extend(unique_edges)
+
     def mesh_tight_areas(self, unique_edges, mesh_res, hint, direction):
         for i in range(len(unique_edges) - 1):
             if abs(np.diff([unique_edges[i], unique_edges[i + 1]])) < mesh_res:
@@ -589,7 +510,8 @@ class Automesher:
                         hint[1].remove(y)
                     hint[1].extend(np.linspace(unique_edges[i], unique_edges[i + 1], 5)[1:-1])
 
-    def mesh_boundaries(self, unique_edges, sorted_points, otheredges, mesh_res, hint, direction):
+    def add_missing_mesh_lines(self, unique_edges, sorted_points, otheredges, mesh_res, hint, direction):
+        'Check if the first and last point are x or y edges, if not it adds the missing mesh lines between the point and the edge'
         if unique_edges[-1] < sorted_points[-1]:
             for other_edge in otheredges:
                 if direction == 'x':
@@ -614,6 +536,54 @@ class Automesher:
                     else:
                         lines = SmoothMeshLines([max(start, end), unique_edges[0]], mesh_res)
                     hint.extend(lines)               
+                    
+    def metal_edge(self, edges, polygon, mesh_res, hint, dirs, metal_edge_res, direction):
+        'not ready yet'
+        if isinstance(polygon, list):
+            coords = [prim.GetCoords() for prim in polygon]
+            print(coords)
+            x = np.concatenate([coord[0] for coord in coords])
+            y = np.concatenate([coord[1] for coord in coords])
+            coords = (x, y)
+        else:
+            coords = polygon.GetCoords()
+            x = polygon.GetCoords()[0]
+            y = polygon.GetCoords()[1] 
+        mer = np.array([-1.0, 2.0]) / 3 * metal_edge_res if metal_edge_res else 0
+        if direction == 'x':
+            min_distance_x = self.calc_min_distance(x)
+        if direction == 'y':
+            min_distance_y = self.calc_min_distance(y)
+        if dirs is not None:
+            for i in range(len(edges) - 1):
+                if metal_edge_res is not None:
+                    if direction == 'x':
+                        condition1 = self.yline_in_polygon(coords, edges[i][0]+min_distance_x/2, edges[i][1], edges[i][2]) and not self.yline_in_polygon(coords, edges[i][0]-min_distance_x/2, edges[i][1], edges[i][2])
+                        condition2 = self.yline_in_polygon(coords, edges[i][0]-min_distance_x/2, edges[i][1], edges[i][2]) and self.yline_in_polygon(coords, edges[i][0]+min_distance_x/2, edges[i][1], edges[i][2])
+                    if direction == 'y':
+                        condition1 = self.xline_in_polygon(coords, edges[i][1], edges[i][2], edges[i][0]+min_distance_y/2) and not self.xline_in_polygon(coords, edges[i][1], edges[i][2], edges[i][0]-min_distance_y/2)
+                        condition2 = self.xline_in_polygon(coords, edges[i][1], edges[i][2], edges[i][0]-min_distance_y/2) and self.xline_in_polygon(coords, edges[i][1], edges[i][2], edges[i][0]+min_distance_y/2)
+                        if i > 0 and abs(edges[i][0] - edges[i + 1][0]) > mesh_res and abs(edges[i][0] - edges[i - 1][0]) > mesh_res:
+                            if condition1:
+                                hint_in_range =  [hint for hint in hint if edges[i][0]-mer[1] <= hint <= edges[i][0]-mer[0]]
+                                if not hint_in_range:
+                                    hint.append(edges[i][0]-mer[1])
+                                    hint.append(edges[i][0]-mer[0])
+                                else:
+                                    hint = [h for h in hint if h not in hint_in_range]
+                                    hint.append(edges[i][0]-mer[1])
+                                    hint.append(edges[i][0]-mer[0])
+                            elif condition2:
+                                continue
+                            else:
+                                hint_in_range =  [hint for hint in hint if edges[i][0]+mer[0] <= hint <= edges[i][0]+mer[1]]
+                                if not hint_in_range:
+                                    hint.append(edges[i][0]+mer[0])
+                                    hint.append(edges[i][0]+mer[1])
+                                else:
+                                    hint = [h for h in hint if h not in hint_in_range]
+                                    hint.append(edges[i][0]+mer[0])
+                                    hint.append(edges[i][0]+mer[1])
 
     def mesh_estimate_cfl_timestep(self, mesh):
         """ mesh_estimate_cfl_timestep(mesh)
