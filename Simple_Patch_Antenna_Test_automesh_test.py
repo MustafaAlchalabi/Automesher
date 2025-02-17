@@ -19,9 +19,6 @@ from openEMS import openEMS
 
 from openEMS.physical_constants import *
 import matplotlib.pyplot as plt
-
-from pycallgraph import PyCallGraph
-from pycallgraph.output import GraphvizOutput
 # from CSXCAD.CSPrimitives import primitives_mesh_setup
 # from CSXCAD.CSProperties import properties_mesh_setup
 from Automesher import Automesher
@@ -154,14 +151,14 @@ y = [substrate_length/2-delta , substrate_length/2-patch_length-delta, substrate
 gap = 12
 x= [-20,  -0, -0, -14,  -8, gap,  gap, 20,  20, -20, -20]
 y= [20 , 20, -2, -10, -10,   -2,   20, 20, -20, -20, 20]
-# x= [-20,  -0, -0, -14, -14, -8,-8, gap,  gap, 20,  20, -20, -20]
-# y= [20 ,  20, -2, -10, -16, -16,-10,  -2,   20, 20, -20, -20, 20]
+x= [-20,  -0, -0, -14, -14, -8,-8, gap,  gap, 20,  20, -20, -20]
+y= [20 ,  20, -2, -10, -16, -16,-10,  -2,   20, 20, -20, -20, 20]
 
 # x =[-20,-20,0,20,20,-8,-8,-20]
 # y =[-20,4,20,20,8,8,-20,-20]
 
-x = [-10,-10,-5,5,10,10,5,-5,-10]
-y = [-10,-6, -6,10,10,6,6,-10,-10]
+# x = [-10,-10,-5,5,10,10,5,-5,-10]
+# y = [-10,-6, -6,10,10,6,6,-10,-10]
 # x = [i *-1 for i in x]
 # y = [i *1 for i in y]
 points = [x,y]
