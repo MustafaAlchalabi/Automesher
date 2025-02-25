@@ -71,7 +71,7 @@ CSX = ContinuousStructure()
 FDTD.SetCSX(CSX)
 mesh = CSX.GetGrid()
 mesh.SetDeltaUnit(1e-3)
-mesh_res = C0/(f0+fc)/1e-3/20
+mesh_res = C0/(f0+fc)/1e-3/25
 # mesh_res=int(1)
 
 global_mesh_setup = {
@@ -161,6 +161,19 @@ y= [20 ,  20, -2, -10, -16, -16,-10,  -2,   20, 20, -20, -20, 20]
 # y = [-10,-6, -6,10,10,6,6,-10,-10]
 # x = [i *-1 for i in x]
 # y = [i *1 for i in y]
+# def rotate_points(x, y, angle_degrees):
+#     angle_radians = np.deg2rad(angle_degrees)
+#     rotation_matrix = np.array([
+#         [np.cos(angle_radians), -np.sin(angle_radians)],
+#         [np.sin(angle_radians), np.cos(angle_radians)]
+#     ])
+#     points = np.vstack((x, y))
+#     rotated_points = rotation_matrix @ points
+#     return rotated_points[0, :], rotated_points[1, :]
+
+# x, y = rotate_points(x, y, 45)
+# print(x)
+# print(y)
 points = [x,y]
 mesh_hint = {
 
