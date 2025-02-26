@@ -155,100 +155,28 @@ class Automesher:
                 mesh[ny] = list(sorted(mesh1[ny] + mesh2[ny]))
         return mesh
 
-    def mesh_hint_from_point(self, point, **kw):
-        """ mesh_hint_from_point(point, dirs)
-
-        Get a grid hint for the coordinates of the point
-
-        :param dirs: str -- 'x','y','z' or 'xy', 'yz' or 'xyz' or 'all'
-        :param mesh: combine mesh hint to existing mesh
-        :returns: (3,) list of mesh hints
-        """
-        hint = [None, None, None]
-        coord = point.GetCoord()
-        dirs = self.primitives_mesh_setup.get((point, 'dirs'), None)
-        for ny in GetMultiDirs(dirs):
-            hint[ny] = [coord[ny],]
-        if 'mesh' in kw:
-            return self.mesh_combine(hint, kw['mesh'])
-        return hint
-
-    def mesh_hint_from_box(self, box, **kw):
-        """ mesh_hint_from_box(box, dirs, metal_edge_res=None, **kw)
-
-        Get a grid hint for the edges of the given box with an an optional 2D metal
-        edge resolution.
-
-        :param dirs: str -- 'x','y','z' or 'xy', 'yz' or 'xyz' or 'all'
-        :param metal_edge_res: float -- 2D flat edge resolution
-        :param up_dir: bool -- Enable upper edge
-        :param down_dir: bool -- Enable lower edge
-        :param mesh: combine mesh hint to existing mesh
-        :returns: (3,) list of mesh hints
-        """
-        dirs = self.primitives_mesh_setup.get((box, 'dirs'), None)
-        metal_edge_res = self.primitives_mesh_setup.get((box, 'metal_edge_res'), None)
-        up_dir   = kw.get('up_dir'  , True)
-        down_dir = kw.get('down_dir', True)
-
-        if metal_edge_res is None:
-            mer = 0
-        else:
-            mer = np.array([-1.0, 2.0])/3 * metal_edge_res
-        if box.HasTransform():
-            sys.stderr.write('FDTD::automesh: Warning, cannot add edges to grid with transformations enabled\n')
-            return
-        hint = [None, None, None]
-        start = np.fmin(box.GetStart(), box.GetStop())
-        stop  = np.fmax(box.GetStart(), box.GetStop())
-        if dirs is not None:
-            for ny in GetMultiDirs(dirs):
-                hint[ny] = []
-                if metal_edge_res is not None and stop[ny]-start[ny]>metal_edge_res:
-                    if down_dir:
-                        hint[ny].append(start[ny]-mer[0])
-                        hint[ny].append(start[ny]-mer[1])
-                    if up_dir:
-                        hint[ny].append(stop[ny]+mer[0])
-                        hint[ny].append(stop[ny]+mer[1])
-                elif stop[ny]-start[ny]:
-                    if down_dir:
-                        hint[ny].append(start[ny])
-                    if up_dir:
-                        hint[ny].append(stop[ny])
-                else:
-                    hint[ny].append(start[ny])
-        else:
-            hint = [None, None, None]
-
-        if 'mesh' in kw:
-            return self.mesh_combine(hint, kw['mesh'])
-        return hint
-
     def mesh_hint_from_polygon(self, polygon, grid, **kw):
         def tranfer_box_to_polygon(box):
             start = np.fmin(box.GetStart(), box.GetStop())
             stop = np.fmax(box.GetStart(), box.GetStop())
             x_coords = [start[0], stop[0], stop[0], start[0], start[0]]
             y_coords = [start[1], start[1], stop[1], stop[1], start[1]]
-            return x_coords, y_coords
+            z_coords = [float(start[2]), float(stop[2])]
+            return x_coords, y_coords, z_coords
         
-        hint = [[], [], None]
+        hint = [[], [], []]
         otheredges = []
         xedges, yedges = [], []
         x= []
         boxes_coords_x = []
         boxes_coords_y = []
+        boxes_coords_z = []
         if isinstance(polygon, list):
             for prim in polygon:
-                # x.append([prim, prim.GetProperty().GetMaterialProperty('epsilon')])
                 if prim.GetType() == CSPrimitives.BOX:
                     boxes_coords_x.extend(tranfer_box_to_polygon(prim)[0])
                     boxes_coords_y.extend(tranfer_box_to_polygon(prim)[1])
-
-        if isinstance(polygon, list):
-            for prim in polygon:
-                if prim.GetType() == CSPrimitives.BOX:
+                    boxes_coords_z.extend(tranfer_box_to_polygon(prim)[2])
                     continue
                 x = prim.GetCoords()[0]
                 y = prim.GetCoords()[1]
@@ -258,15 +186,39 @@ class Automesher:
             coords = [prim.GetCoords() for prim in polygon if prim.GetType() != CSPrimitives.BOX]
             x = []
             y = []
+            z = [prim.GetElevation() for prim in polygon if prim.GetType() != CSPrimitives.BOX] 
+            z.extend(prim.GetElevation() + prim.GetLength() for prim in polygon if prim.GetType() == CSPrimitives.LINPOLY)
+            z.extend(boxes_coords_z)
+            z = np.unique(z)
+            hint[2].extend(z)
             for coord in coords:
                 x.extend(coord[0])
                 y.extend(coord[1])
             x.extend(boxes_coords_x)
             y.extend(boxes_coords_y)
             N = len(x)
-            dirs = self.primitives_mesh_setup.get(polygon[0], {}).get('dirs') or \
-                self.properties_mesh_setup.get(polygon[0].GetProperty(), {}).get('dirs') or \
-                self.global_mesh_setup.get('dirs')
+            dirs = self.global_mesh_setup.get('dirs')
+
+            # dirs_primitives = []
+            # coords = [[],[],[]]
+            # for prim in polygon:
+            #     prim_dirs = self.primitives_mesh_setup.get(prim, {}).get('dirs', None)
+            #     if not prim_dirs:
+            #         prim_dirs = self.properties_mesh_setup.get(prim.GetProperty(), {}).get('dirs', None)
+            #     if prim_dirs and prim_dirs != self.global_mesh_setup.get('dirs'):
+            #         dirs_primitives.append((prim, prim_dirs))
+            #     if prim_dirs is None:
+            #         prim_dirs = self.global_mesh_setup.get('dirs')
+            #     if prim_dirs:
+            #         dirs_primitives.append((prim, prim_dirs))
+            # if dirs_primitives:
+            #     for prim, dirs in dirs_primitives:
+            #         if prim.GetType() != CSPrimitives.BOX:
+                        # for ny in GetMultiDirs(dirs):
+                        
+  
+                                                
+
             metal_edge_res = self.primitives_mesh_setup.get(polygon[0], {}).get('metal_edge_res') or \
                             self.properties_mesh_setup.get(polygon[0].GetProperty(), {}).get('metal_edge_res') or \
                             self.global_mesh_setup.get('metal_edge_res')
@@ -297,7 +249,7 @@ class Automesher:
             hint = [None, None, None]
         unique_xedges = np.unique(np.sort([edge[0] for edge in xedges]))
         unique_yedges = np.unique(np.sort([edge[0] for edge in yedges]))
-        # otheredges = np.array(otheredges, dtype=float).tolist()
+
         sorted_x = np.sort(x) 
         sorted_y = np.sort(y)
 
@@ -376,7 +328,6 @@ class Automesher:
             if abs(hint[1][i] - hint[1][i+1]) <= mesh_res/20:
                 hint[1][i] = (hint[1][i] + hint[1][i+1])/2
                 hint[1][i+1] = hint[1][i]
-
         realhint = [None, None, None]
         if dirs is not None:
             for ny in GetMultiDirs(dirs):
@@ -466,8 +417,11 @@ class Automesher:
             for j in range(i + 1, len(otheredges)):
                 line1 = otheredges[i]
                 line2 = otheredges[j]
-                angle = np.round(np.rad2deg(np.arccos(np.dot([line1[1] - line1[0], line1[3] - line1[2]], [line2[1] - line2[0], line2[3] - line2[2]]) /
-                                (np.linalg.norm([line1[1] - line1[0], line1[3] - line1[2]]) * np.linalg.norm([line2[1] - line2[0], line2[3] - line2[2]])))), 2)
+
+                dot_product = np.dot([line1[1] - line1[0], line1[3] - line1[2]], [line2[1] - line2[0], line2[3] - line2[2]])
+                norm_product = np.linalg.norm([line1[1] - line1[0], line1[3] - line1[2]]) * np.linalg.norm([line2[1] - line2[0], line2[3] - line2[2]])
+                cos_angle = np.clip(dot_product / norm_product, -1.0, 1.0)
+                angle = np.round(np.rad2deg(np.arccos(cos_angle)), 2)
                 if np.isclose(angle, 90, atol=1e-2):
                     continue
                 p1 = np.array([line1[0], line1[2]])  # (x1, y1)
