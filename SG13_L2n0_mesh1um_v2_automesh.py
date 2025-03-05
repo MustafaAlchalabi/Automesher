@@ -253,7 +253,7 @@ primitives_mesh_setup[polygon2] = mesh_hint
 mesh_hint = {
         'metal_edge_res': None, 'dirs': 'xyz'
     }
-x = [-15,-15,-5,5,15,15,5,-5,-15]
+x = [-15,-15,-5,5,15.2,15.2,5,-5,-15]
 y = [-10,-6, -6,10,10,6,6,-10,-10]
 x = [i+65 for i in x]
 y = [i+180 for i in y]
@@ -420,7 +420,7 @@ pts_y = r_[pts_y, 283.370]
 
 pts = np.array([pts_x, pts_y])
 # polygon6 =TopVia2.AddPolygon(priority=200, points=pts, norm_dir ='z', elevation=TopVia2_zmin)
-polygon6 = TopVia2.AddLinPoly(priority=200, points=pts, norm_dir ='z', elevation=TopVia2_zmin, length=TopVia2_thick)
+polygon6 = TopVia2.AddLinPoly(priority=100, points=pts, norm_dir ='z', elevation=TopVia2_zmin, length=TopVia2_thick)
 primitives_mesh_setup[polygon6] = mesh_hint
 
 pts_x = np.array([])
@@ -435,7 +435,7 @@ pts_x = r_[pts_x, 11.850]
 pts_y = r_[pts_y, 268.370]
 
 pts = np.array([pts_x, pts_y])
-polygon7 = TopVia2.AddLinPoly(priority=200, points=pts, norm_dir ='z', elevation=TopVia2_zmin, length=TopVia2_thick)
+polygon7 = TopVia2.AddLinPoly(priority=100, points=pts, norm_dir ='z', elevation=TopVia2_zmin, length=TopVia2_thick)
 primitives_mesh_setup[polygon7] = mesh_hint
 
 pts_x = np.array([])
@@ -450,7 +450,7 @@ pts_x = r_[pts_x, -33.580]
 pts_y = r_[pts_y, 56.370]
 
 pts = np.array([pts_x, pts_y])
-polygon8 = TopVia2.AddLinPoly(priority=200, points=pts, norm_dir ='z', elevation=TopVia2_zmin, length=TopVia2_thick)
+polygon8 = TopVia2.AddLinPoly(priority=100, points=pts, norm_dir ='z', elevation=TopVia2_zmin, length=TopVia2_thick)
 primitives_mesh_setup[polygon8] = mesh_hint
 
 pts_x = np.array([])
@@ -465,7 +465,7 @@ pts_x = r_[pts_x, 22.820]
 pts_y = r_[pts_y, 56.370]
 
 pts = np.array([pts_x, pts_y])
-polygon9 = TopVia2.AddLinPoly(priority=200, points=pts, norm_dir ='z', elevation=TopVia2_zmin, length=TopVia2_thick)
+polygon9 = TopVia2.AddLinPoly(priority=100, points=pts, norm_dir ='z', elevation=TopVia2_zmin, length=TopVia2_thick)
 primitives_mesh_setup[polygon9] = mesh_hint
 
 # Bounding box of geometry
@@ -480,8 +480,8 @@ geometry_ymax= 284.000
 ############ ports created manually ##########
 
 # port in x direction, 50 Ohm reference impedance
-port = FDTD.AddLumpedPort(1, 50, [-22.2, 0, TopMetal1_zmin], [22.2, 10, TopMetal1_zmax], 'x', 1.0, priority=150)
-
+port = FDTD.AddLumpedPort(1, 50, [-22.2, 0, TopMetal1_zmin], [22.2, 10, TopMetal1_zmax], 'x', 1.0, priority=300)
+primitives_mesh_setup[port] = {'metal_edge_res': None, 'dirs': 'xyz'}
 #################  end ports  ################
 
 geometry_width = geometry_xmax - geometry_xmin
@@ -594,12 +594,8 @@ mesh.AddLine('z', Sub_zmin)
 
 global_mesh_setup = {
     'dirs': 'xyz',
-    'mesh_resolution': refined_cellsize,
+    'mesh_resolution': 5,
     'drawing_unit': unit,
-    'start_frequency': fstart,
-    'stop_frequency': fstop,
-    'f0': None,
-    'fc': None,
     'max_cellsize': max_cellsize,
     'min_cellsize': 1,
 }
@@ -608,7 +604,6 @@ properties_mesh_setup = {}
 AM = Automesher()
 
 AM.GenMesh(CSX, global_mesh_setup,primitives_mesh_setup,properties_mesh_setup)
-print('max cellsize:', max_cellsize)
 # mesh.SmoothMeshLines('x', max_cellsize, 1.3)
 # mesh.SmoothMeshLines('y', max_cellsize, 1.3)
 # mesh.SmoothMeshLines('z', max_cellsize, 1.3)

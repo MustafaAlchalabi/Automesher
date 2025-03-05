@@ -71,7 +71,7 @@ CSX = ContinuousStructure()
 FDTD.SetCSX(CSX)
 mesh = CSX.GetGrid()
 mesh.SetDeltaUnit(1e-3)
-mesh_res = C0/(f0+fc)/1e-3/25
+mesh_res = C0/(f0+fc)/1e-3/20
 # mesh_res=int(1)
 
 global_mesh_setup = {

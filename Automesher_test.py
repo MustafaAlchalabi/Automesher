@@ -78,9 +78,10 @@ mesh_res = C0/(f0+fc)/1e-3/20
 # mesh_res=int(1)
 
 global_mesh_setup = {
-    'dirs': 'y',
+    'dirs': 'xy',
     'mesh_resolution': mesh_res,
     'drawing_unit': 1e-3,
+    'min_cellsize': 3,
 }
 properties_mesh_setup={}
 primitives_mesh_setup={}
