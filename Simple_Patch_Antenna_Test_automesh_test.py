@@ -75,9 +75,10 @@ mesh_res = C0/(f0+fc)/1e-3/20
 # mesh_res=int(1)
 
 global_mesh_setup = {
-    'dirs': 'y',
+    'dirs': 'xy',
     'mesh_resolution': mesh_res,
     'drawing_unit': 1e-3,
+     'max_cellsize': mesh_res*3,
 }
 properties_mesh_setup={}
 primitives_mesh_setup={}
@@ -91,7 +92,7 @@ metal_edge_res=mesh_res/2
 # create patch
 mesh_hint = {
 
-    'dirs': 'x',
+    'dirs': 'xy',
     'metal_edge_res' : None,
     'mesh_resolution' : mesh_res
 }

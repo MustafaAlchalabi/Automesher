@@ -25,7 +25,7 @@ from CSXCAD.SmoothMeshLines import SmoothMeshLines
 
 # preview model/mesh only?
 # postprocess existing data without re-running simulation?
-preview_only = False
+preview_only = True
 postprocess_only = False
 # os.path.realpath(os.path.join('.', 'Simple_Patch_Antenna_Test_automesh_points'))
 # get *.py model path and put simulation files in data directory below
@@ -250,16 +250,16 @@ primitives_mesh_setup[polygon2] = mesh_hint
 # polygon2 = TopMetal2.AddPolygon(priority=200, points=pts, norm_dir ='z', elevation=TopMetal1_zmin)
 # primitives_mesh_setup[polygon2] = mesh_hint
 
-mesh_hint = {
-        'metal_edge_res': None, 'dirs': 'xyz'
-    }
-x = [-15,-15,-5,5,15.2,15.2,5,-5,-15]
-y = [-10,-6, -6,10,10,6,6,-10,-10]
-x = [i+65 for i in x]
-y = [i+180 for i in y]
-points = [x,y]
-polygon3 = TopMetal2.AddLinPoly(priority=200, points=points, norm_dir ='z', elevation=TopMetal1_zmin, length=20)
-primitives_mesh_setup[polygon3] = mesh_hint
+# mesh_hint = {
+#         'metal_edge_res': None, 'dirs': 'xyz'
+#     }
+# x = [-15,-15,-5,5,15.2,15.2,5,-5,-15]
+# y = [-10,-6, -6,10,10,6,6,-10,-10]
+# x = [i+65 for i in x]
+# y = [i+180 for i in y]
+# points = [x,y]
+# polygon3 = TopMetal2.AddLinPoly(priority=200, points=points, norm_dir ='z', elevation=TopMetal1_zmin, length=20)
+# primitives_mesh_setup[polygon3] = mesh_hint
 
 mesh_hint = {
         'metal_edge_res': None, 'dirs': 'xyz'
@@ -325,15 +325,15 @@ pts = np.array([pts_x, pts_y])
 polygon4 = TopMetal2.AddLinPoly(priority=200, points=pts, norm_dir ='z', elevation=TopMetal2_zmin, length=TopMetal2_thick)
 primitives_mesh_setup[polygon4] = mesh_hint
 
-start = [-80,160,TopMetal2_zmin]
-stop = [-40,200,TopMetal2_zmin+5]
-box1 = TopMetal2.AddBox(priority=200, start=start, stop=stop)
-primitives_mesh_setup[box1] = mesh_hint
+# start = [-80,160,TopMetal2_zmin]
+# stop = [-40,200,TopMetal2_zmin+5]
+# box1 = TopMetal2.AddBox(priority=200, start=start, stop=stop)
+# primitives_mesh_setup[box1] = mesh_hint
 
-start = [-30,80,TopMetal2_zmin]
-stop = [30,110,TopMetal2_zmin]
-box1 = TopMetal2.AddBox(priority=200, start=start, stop=stop)
-primitives_mesh_setup[box1] = mesh_hint
+# start = [-30,80,TopMetal2_zmin]
+# stop = [30,110,TopMetal2_zmin]
+# box1 = TopMetal2.AddBox(priority=200, start=start, stop=stop)
+# primitives_mesh_setup[box1] = mesh_hint
 
 pts_x = np.array([])
 pts_y = np.array([])
@@ -494,15 +494,15 @@ box_ymin = geometry_ymin - 1.0 * geometry_height
 box_ymax = geometry_ymax + 1.0 * geometry_height
 
 # create boxes for substrate, oxide etc that are not drawn in GDSII layout
-# mesh_hint = {
-#     'metal_edge_res': None, 'dirs': 'z'
-# }
-# Sub = Sub.AddBox(priority=10, start=[box_xmin, box_ymin, Sub_zmin], stop=[box_xmax, box_ymax, Sub_zmax])
-# EPI = EPI.AddBox(priority=10, start=[box_xmin, box_ymin, EPI_zmin], stop=[box_xmax, box_ymax, EPI_zmax])
-# SiO2 = SiO2.AddBox(priority=10, start=[box_xmin, box_ymin, SiO2_zmin], stop=[box_xmax, box_ymax, SiO2_zmax])
-# primitives_mesh_setup[Sub] = mesh_hint
-# primitives_mesh_setup[EPI] = mesh_hint
-# primitives_mesh_setup[SiO2] = mesh_hint
+mesh_hint = {
+    'dirs': 'xyz', 'edges_only': True
+}
+Sub = Sub.AddBox(priority=10, start=[box_xmin, box_ymin, Sub_zmin], stop=[box_xmax, box_ymax, Sub_zmax])
+EPI = EPI.AddBox(priority=10, start=[box_xmin, box_ymin, EPI_zmin], stop=[box_xmax, box_ymax, EPI_zmax])
+SiO2 = SiO2.AddBox(priority=10, start=[box_xmin, box_ymin, SiO2_zmin], stop=[box_xmax, box_ymax, SiO2_zmax])
+primitives_mesh_setup[Sub] = mesh_hint
+primitives_mesh_setup[EPI] = mesh_hint
+primitives_mesh_setup[SiO2] = mesh_hint
 # ############# create vertical mesh  #############
 
 def add_equal_meshlines (axis, start, stop, number):
@@ -620,103 +620,103 @@ if not postprocess_only: # skip model preview and simulation
 if not preview_only:  # start simulation 
     if not postprocess_only:
         print("Running simulation ...")
-    #     FDTD.Run(sim_path, verbose=1)
+        FDTD.Run(sim_path, verbose=1)
     
-    # ## Post-processing and plotting ###
-    # f = np.linspace(fstart,fstop,numfreq)
-    # port.CalcPort(sim_path, f)
+    ## Post-processing and plotting ###
+    f = np.linspace(fstart,fstop,numfreq)
+    port.CalcPort(sim_path, f)
 
-    # s11 = port.uf_ref/port.uf_inc
-    # s11_dB = 20.0*np.log10(np.abs(s11))
-    # s11_phase = angle(s11, deg=True) 
+    s11 = port.uf_ref/port.uf_inc
+    s11_dB = 20.0*np.log10(np.abs(s11))
+    s11_phase = angle(s11, deg=True) 
 
-    # Zin = port.uf_tot / port.if_tot
+    Zin = port.uf_tot / port.if_tot
 
    
-    # # S11 dB
-    # figure()
-    # plot(f/1e9, s11_dB, 'k-', linewidth=2, label='$S_{11}$')
-    # grid()
-    # legend()
-    # ylabel('S11 (dB)')
-    # xlabel('Frequency (GHz)')
+    # S11 dB
+    figure()
+    plot(f/1e9, s11_dB, 'k-', linewidth=2, label='$S_{11}$')
+    grid()
+    legend()
+    ylabel('S11 (dB)')
+    xlabel('Frequency (GHz)')
 
-    # # S11 phase
-    # figure()
-    # plot(f/1e9, s11_phase, 'k-', linewidth=2, label='$S_{11}$')
-    # grid()
-    # legend()
-    # ylabel('S11 (degree)')
-    # xlabel('Frequency (GHz)')
+    # S11 phase
+    figure()
+    plot(f/1e9, s11_phase, 'k-', linewidth=2, label='$S_{11}$')
+    grid()
+    legend()
+    ylabel('S11 (degree)')
+    xlabel('Frequency (GHz)')
         
-    # # Rseries
-    # Rseries = real(Zin)
-    # figure()
-    # plot(f/1e9, Rseries, 'k-', linewidth=2, label='Rseries')
-    # ylim(0, 10)
-    # xlim(0, fstop/1e9)
-    # grid()
-    # legend()
-    # ylabel('Rseries (Ohm)')
-    # xlabel('Frequency (GHz)')
+    # Rseries
+    Rseries = real(Zin)
+    figure()
+    plot(f/1e9, Rseries, 'k-', linewidth=2, label='Rseries')
+    ylim(0, 10)
+    xlim(0, fstop/1e9)
+    grid()
+    legend()
+    ylabel('Rseries (Ohm)')
+    xlabel('Frequency (GHz)')
 
-    # # ignore warning when dividing by zero frequency in L calculation
-    # import warnings
-    # warnings.filterwarnings('ignore')
+    # ignore warning when dividing by zero frequency in L calculation
+    import warnings
+    warnings.filterwarnings('ignore')
 
-    # # Lseries
-    # omega = 2*pi*f
-    # Lseries = imag(Zin)/omega
-    # figure()
-    # plot(f/1e9, Lseries*1e9, 'k-', linewidth=2, label='Lseries')
-    # ylim(0, 10)
-    # xlim(0, fstop/1e9)
-    # grid()
-    # legend()
-    # ylabel('Lseries (nH)')
-    # xlabel('Frequency (GHz)')
+    # Lseries
+    omega = 2*pi*f
+    Lseries = imag(Zin)/omega
+    figure()
+    plot(f/1e9, Lseries*1e9, 'k-', linewidth=2, label='Lseries')
+    ylim(0, 10)
+    xlim(0, fstop/1e9)
+    grid()
+    legend()
+    ylabel('Lseries (nH)')
+    xlabel('Frequency (GHz)')
 
-    # # Q factor
-    # Q = imag(Zin)/real(Zin)
-    # figure()
-    # plot(f/1e9, Q, 'k-', linewidth=2, label='Q')
-    # ylim(0, 30)
-    # xlim(0, fstop/1e9)
-    # grid()
-    # legend()
-    # ylabel('Q factor')
-    # xlabel('Frequency (GHz)')
+    # Q factor
+    Q = imag(Zin)/real(Zin)
+    figure()
+    plot(f/1e9, Q, 'k-', linewidth=2, label='Q')
+    ylim(0, 30)
+    xlim(0, fstop/1e9)
+    grid()
+    legend()
+    ylabel('Q factor')
+    xlabel('Frequency (GHz)')
 
-    # # print some inductor data
-    # # get series L and series R at frequency of interest
-    # targetfreq = 10e9
-    # findex = where (f>=targetfreq)[0]
-    # findex = findex.item(0)
+    # print some inductor data
+    # get series L and series R at frequency of interest
+    targetfreq = 10e9
+    findex = where (f>=targetfreq)[0]
+    findex = findex.item(0)
 
-    # print('Frequency [GHz]:', str(f[findex]/1e9))
-    # print('Series L  [nH] :', str(Lseries[findex]*1e9))
-    # print('Series R  [Ohm]:', str(Rseries[findex]))
-    # print('Q factor       :', str(Q[findex]))
-    # print('----------------')
-    # print('L_DC      [nH] :', str(Lseries[1]*1e9))
-    # print('R_DC      [Ohm]:', str(Rseries[0]))
-    # print('Peak Q         :', str(max(Q)))
+    print('Frequency [GHz]:', str(f[findex]/1e9))
+    print('Series L  [nH] :', str(Lseries[findex]*1e9))
+    print('Series R  [Ohm]:', str(Rseries[findex]))
+    print('Q factor       :', str(Q[findex]))
+    print('----------------')
+    print('L_DC      [nH] :', str(Lseries[1]*1e9))
+    print('R_DC      [Ohm]:', str(Rseries[0]))
+    print('Peak Q         :', str(max(Q)))
 
 
-    # # create Touchstone S1P output file in simulation data path
-    # s1p_name = os.path.join(sim_path, model_basename + '.s1p')
-    # s1p_file = open(s1p_name, 'w')
-    # s1p_file.write('#   Hz   S  RI   R   50\n')
-    # s1p_file.write('!\n')
-    # for index in range(0, numfreq):
-    #     freq = f[index]
-    #     re = real(s11[index])
-    #     im = imag(s11[index])
-    #     s1p_file.write(str(freq) + ' ' + str(re) + ' ' + str(im) + '\n')
-    # s1p_file.close()
+    # create Touchstone S1P output file in simulation data path
+    s1p_name = os.path.join(sim_path, model_basename + '.s1p')
+    s1p_file = open(s1p_name, 'w')
+    s1p_file.write('#   Hz   S  RI   R   50\n')
+    s1p_file.write('!\n')
+    for index in range(0, numfreq):
+        freq = f[index]
+        re = real(s11[index])
+        im = imag(s11[index])
+        s1p_file.write(str(freq) + ' ' + str(re) + ' ' + str(im) + '\n')
+    s1p_file.close()
 
-    # # Show all plots
-    # show()
+    # Show all plots
+    show()
 
     
 
