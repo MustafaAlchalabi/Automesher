@@ -49,7 +49,7 @@ os.chdir(sim_path)
  
 unit = 1e-6 # specify everything in um
 
-refined_cellsize = 5  # mesh resolution in area with polygons from GDSII
+refined_cellsize = 2  # mesh resolution in area with polygons from GDSII
 
 fstart = 0
 fstop  = 30e9
@@ -419,7 +419,6 @@ pts_x = r_[pts_x, -22.610]
 pts_y = r_[pts_y, 283.370]
 
 pts = np.array([pts_x, pts_y])
-# polygon6 =TopVia2.AddPolygon(priority=200, points=pts, norm_dir ='z', elevation=TopVia2_zmin)
 polygon6 = TopVia2.AddLinPoly(priority=100, points=pts, norm_dir ='z', elevation=TopVia2_zmin, length=TopVia2_thick)
 primitives_mesh_setup[polygon6] = mesh_hint
 
@@ -495,7 +494,7 @@ box_ymax = geometry_ymax + 1.0 * geometry_height
 
 # create boxes for substrate, oxide etc that are not drawn in GDSII layout
 mesh_hint = {
-    'dirs': 'xyz', 'edges_only': True
+    'dirs': 'xyz', 'edges_only': False
 }
 Sub = Sub.AddBox(priority=10, start=[box_xmin, box_ymin, Sub_zmin], stop=[box_xmax, box_ymax, Sub_zmax])
 EPI = EPI.AddBox(priority=10, start=[box_xmin, box_ymin, EPI_zmin], stop=[box_xmax, box_ymax, EPI_zmax])
@@ -594,20 +593,19 @@ mesh.AddLine('z', Sub_zmin)
 
 global_mesh_setup = {
     'dirs': 'xyz',
-    'mesh_resolution': 5,
+    # 'refined_cellsize': 5,
     'drawing_unit': unit,
-    'max_cellsize': max_cellsize,
-    'min_cellsize': 1,
+    # 'min_cellsize': 1,
+    'start_frequency': fstart,
+    'stop_frequency': fstop,
+    'mesh_resolution': 'medium',
+    # 'max_cellsize': max_cellsize,
 }
 
 properties_mesh_setup = {}
 AM = Automesher()
 
 AM.GenMesh(CSX, global_mesh_setup,primitives_mesh_setup,properties_mesh_setup)
-# mesh.SmoothMeshLines('x', max_cellsize, 1.3)
-# mesh.SmoothMeshLines('y', max_cellsize, 1.3)
-# mesh.SmoothMeshLines('z', max_cellsize, 1.3)
-
 
 #################### write model file and view in AppCSXCAD ################
 CSX_file = os.path.join(sim_path, model_basename + '.xml')
@@ -648,7 +646,12 @@ if not preview_only:  # start simulation
     legend()
     ylabel('S11 (degree)')
     xlabel('Frequency (GHz)')
-        
+        # Save frequency, S11 magnitude, and phase to a text file
+    output_file = os.path.join(sim_path, model_basename + '_s11_phase.txt')
+    with open(output_file, 'w') as file:
+        for i in range(len(f)):
+            file.write(f"{f[i]:.16e} {s11_dB[i]:.16e} {s11_phase[i]:.16e}\n")
+    print(f"Data saved to {output_file}")
     # Rseries
     Rseries = real(Zin)
     figure()
@@ -659,7 +662,15 @@ if not preview_only:  # start simulation
     legend()
     ylabel('Rseries (Ohm)')
     xlabel('Frequency (GHz)')
-
+    # Real and Imaginary parts of Zin
+    figure()
+    plot(f/1e9, real(Zin), 'b-', linewidth=2, label='Re(Zin)')
+    plot(f/1e9, imag(Zin), 'r--', linewidth=2, label='Im(Zin)')
+    grid()
+    legend()
+    ylabel('Impedance (Ohm)')
+    xlabel('Frequency (GHz)')
+    title('Real and Imaginary Parts of Zin')
     # ignore warning when dividing by zero frequency in L calculation
     import warnings
     warnings.filterwarnings('ignore')

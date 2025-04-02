@@ -79,9 +79,11 @@ mesh_res = C0/(f0+fc)/1e-3/20
 
 global_mesh_setup = {
     'dirs': 'xy',
-    'mesh_resolution': mesh_res,
+    'mesh_resolution': 'medium',
     'drawing_unit': 1e-3,
-    'min_cellsize': 3,
+    # 'min_cellsize': 3,
+    'f0' : f0,
+    'fc' : fc,
 }
 properties_mesh_setup={}
 primitives_mesh_setup={}
@@ -268,4 +270,7 @@ if not post_proc_only:
 # xlabel('Frequency (GHz)')
 
 # show()
+
+
+
 

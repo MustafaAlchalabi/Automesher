@@ -76,9 +76,12 @@ mesh_res = C0/(f0+fc)/1e-3/20
 
 global_mesh_setup = {
     'dirs': 'xy',
-    'mesh_resolution': mesh_res,
+    'mesh_resolution': 'very_high',
     'drawing_unit': 1e-3,
-     'max_cellsize': mesh_res*3,
+    #  'max_cellsize': mesh_res*3,
+    #  'min_cellsize': mesh_res/4,
+     'f0' : f0,
+        'fc' : fc,
 }
 properties_mesh_setup={}
 primitives_mesh_setup={}
@@ -153,7 +156,18 @@ gap = 12
 x= [-20,  -0, -0, -14,  -8, gap,  gap, 20,  20, -20, -20]
 y= [20 , 20, -2, -10, -10,   -2,   20, 20, -20, -20, 20]
 x= [-20,  -0, -0, -14, -14, -8,-8, gap,  gap, 20,  20, -20, -20]
-y= [20 ,  20, -2, -10, -16, -16,-10,  -2,   20, 20, -20, -20, 20]
+y= [20 ,  20, -3, -10, -16, -16,-10,  -2,   20, 20, -20, -20, 20]
+
+x= [-20,  12, 12, -14, -14, -8,-8, gap,  gap, 20,  20, -20, -20]
+y= [20 ,  20, -1, -7, -16, -16,-10,  -2,   -2, -2, -20, -20, 20]
+
+# Generate a circle using polygon with x and y coordinates
+circle_radius = 10
+num_points = 50
+theta = np.linspace(0, 2 * np.pi, num_points)
+# x = circle_radius * np.cos(theta)
+# y = circle_radius * np.sin(theta)
+
 
 # x =[-20,-20,0,20,20,-8,-8,-20]
 # y =[-20,4,20,20,8,8,-20,-20]
