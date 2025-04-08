@@ -594,8 +594,8 @@ mesh.AddLine('z', Sub_zmin)
 global_mesh_setup = {
     'dirs': 'xyz',
     # 'refined_cellsize': 5,
-    'drawing_unit': unit,
     # 'min_cellsize': 1,
+    'drawing_unit': unit,
     'start_frequency': fstart,
     'stop_frequency': fstop,
     'mesh_resolution': 'medium',
