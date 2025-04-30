@@ -79,7 +79,7 @@ global_mesh_setup = {
     'mesh_resolution': 'medium',
     'drawing_unit': 1e-3,
     #  'max_cellsize': mesh_res*3,
-    #  'min_cellsize': mesh_res/4,
+     'min_cellsize': mesh_res/155,
     'f0' : f0,
     'fc' : fc,
 }

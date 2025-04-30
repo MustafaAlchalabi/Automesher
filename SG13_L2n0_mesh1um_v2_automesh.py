@@ -502,6 +502,9 @@ SiO2 = SiO2.AddBox(priority=10, start=[box_xmin, box_ymin, SiO2_zmin], stop=[box
 primitives_mesh_setup[Sub] = mesh_hint
 primitives_mesh_setup[EPI] = mesh_hint
 primitives_mesh_setup[SiO2] = mesh_hint
+
+
+
 # ############# create vertical mesh  #############
 
 def add_equal_meshlines (axis, start, stop, number):
@@ -599,6 +602,7 @@ global_mesh_setup = {
     'start_frequency': fstart,
     'stop_frequency': fstop,
     'mesh_resolution': 'medium',
+    # 'num_lines': 3,
     # 'max_cellsize': max_cellsize,
 }
 
@@ -606,6 +610,15 @@ properties_mesh_setup = {}
 AM = Automesher()
 
 AM.GenMesh(CSX, global_mesh_setup,primitives_mesh_setup,properties_mesh_setup)
+
+# SimBox = np.array([7881, 15852/2, 15300/2])
+# mesh.AddLine('x', [-SimBox[0], SimBox[0]])
+# mesh.AddLine('y', [-SimBox[1], SimBox[1]]          )
+# mesh.AddLine('z', [-SimBox[2], SimBox[2]]        )
+
+
+# mesh.SmoothMeshLines('all', wavelength_air/2, 1.3)
+
 
 #################### write model file and view in AppCSXCAD ################
 CSX_file = os.path.join(sim_path, model_basename + '.xml')
@@ -651,6 +664,12 @@ if not preview_only:  # start simulation
     with open(output_file, 'w') as file:
         for i in range(len(f)):
             file.write(f"{f[i]:.16e} {s11_dB[i]:.16e} {s11_phase[i]:.16e}\n")
+    # Save Zin to a text file as frequency, real(Zin), imag(Zin)
+    output_file = os.path.join(sim_path, model_basename + '_Zin.txt')
+    with open(output_file, 'w') as file:
+        for i in range(len(f)):
+            file.write(f"{f[i]:.16e} {real(Zin[i]):.16e} {imag(Zin[i]):.16e}\n")
+            
     print(f"Data saved to {output_file}")
     # Rseries
     Rseries = real(Zin)
