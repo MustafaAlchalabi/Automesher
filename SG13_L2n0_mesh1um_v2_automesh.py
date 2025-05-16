@@ -608,13 +608,13 @@ global_mesh_setup = {
 
 properties_mesh_setup = {}
 AM = Automesher()
-
-AM.GenMesh(CSX, global_mesh_setup,primitives_mesh_setup,properties_mesh_setup)
-
 # SimBox = np.array([7881, 15852/2, 15300/2])
 # mesh.AddLine('x', [-SimBox[0], SimBox[0]])
 # mesh.AddLine('y', [-SimBox[1], SimBox[1]]          )
 # mesh.AddLine('z', [-SimBox[2], SimBox[2]]        )
+
+AM.GenMesh(CSX, global_mesh_setup,primitives_mesh_setup,properties_mesh_setup)
+
 
 
 # mesh.SmoothMeshLines('all', wavelength_air/2, 1.3)
