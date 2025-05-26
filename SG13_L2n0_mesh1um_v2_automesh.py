@@ -228,7 +228,7 @@ pts_y = r_[pts_y, 57.000]
 pts_x = r_[pts_x, 22.200]
 pts_y = r_[pts_y, 0.000]
 pts = np.array([pts_x, pts_y])
-polygon1 = TopMetal1.AddLinPoly(priority=200, points=pts, norm_dir ='z', elevation=TopMetal1_zmin, length=TopMetal1_thick)
+polygon1 = TopMetal1.AddLinPoly(priority=100, points=pts, norm_dir ='z', elevation=TopMetal1_zmin, length=TopMetal1_thick)
 primitives_mesh_setup[polygon1] = mesh_hint
 
 
@@ -245,7 +245,7 @@ pts_y = r_[pts_y, 57.000]
 pts_x = r_[pts_x, -34.200]
 pts_y = r_[pts_y, 0.000]
 pts = np.array([pts_x, pts_y])
-polygon2 = TopMetal1.AddLinPoly(priority=200, points=pts, norm_dir ='z', elevation=TopMetal1_zmin, length=TopMetal1_thick)
+polygon2 = TopMetal1.AddLinPoly(priority=100, points=pts, norm_dir ='z', elevation=TopMetal1_zmin, length=TopMetal1_thick)
 primitives_mesh_setup[polygon2] = mesh_hint
 # polygon2 = TopMetal2.AddPolygon(priority=200, points=pts, norm_dir ='z', elevation=TopMetal1_zmin)
 # primitives_mesh_setup[polygon2] = mesh_hint
@@ -284,7 +284,7 @@ pts_x = r_[pts_x, -23.230]
 pts_y = r_[pts_y, 284.000]
 
 pts = np.array([pts_x, pts_y])
-polygon3 = TopMetal1.AddLinPoly(priority=200, points=pts, norm_dir ='z', elevation=TopMetal1_zmin, length=TopMetal1_thick)
+polygon3 = TopMetal1.AddLinPoly(priority=100, points=pts, norm_dir ='z', elevation=TopMetal1_zmin, length=TopMetal1_thick)
 primitives_mesh_setup[polygon3] = mesh_hint
 
 pts_x = np.array([])
@@ -322,7 +322,7 @@ pts = np.array([pts_x, pts_y])
 # # Create the rotated polygon
 # rotated_polygon = TopMetal2.AddLinPoly(priority=200, points=rotated_pts, norm_dir='z', elevation=TopMetal2_zmin, length=TopMetal2_thick)
 # primitives_mesh_setup[rotated_polygon] = mesh_hint
-polygon4 = TopMetal2.AddLinPoly(priority=200, points=pts, norm_dir ='z', elevation=TopMetal2_zmin, length=TopMetal2_thick)
+polygon4 = TopMetal2.AddLinPoly(priority=100, points=pts, norm_dir ='z', elevation=TopMetal2_zmin, length=TopMetal2_thick)
 primitives_mesh_setup[polygon4] = mesh_hint
 
 # start = [-80,160,TopMetal2_zmin]
@@ -403,7 +403,7 @@ pts_x = r_[pts_x, -41.425]
 pts_y = r_[pts_y, 57.000]
 
 pts = np.array([pts_x, pts_y])
-polygon5 = TopMetal2.AddLinPoly(priority=200, points=pts, norm_dir ='z', elevation=TopMetal2_zmin, length=TopMetal2_thick)
+polygon5 = TopMetal2.AddLinPoly(priority=100, points=pts, norm_dir ='z', elevation=TopMetal2_zmin, length=TopMetal2_thick)
 primitives_mesh_setup[polygon5] = mesh_hint
 
 
@@ -596,22 +596,18 @@ mesh.AddLine('z', Sub_zmin)
 
 global_mesh_setup = {
     'dirs': 'xyz',
-    # 'refined_cellsize': 5,
-    # 'min_cellsize': 1,
     'drawing_unit': unit,
     'start_frequency': fstart,
     'stop_frequency': fstop,
-    'mesh_resolution': 'medium',
+    'mesh_resolution': 'very_high',
+    # 'refined_cellsize': 10,
+    # 'min_cellsize': 0.5,
     # 'num_lines': 3,
     # 'max_cellsize': max_cellsize,
 }
 
 properties_mesh_setup = {}
 AM = Automesher()
-# SimBox = np.array([7881, 15852/2, 15300/2])
-# mesh.AddLine('x', [-SimBox[0], SimBox[0]])
-# mesh.AddLine('y', [-SimBox[1], SimBox[1]]          )
-# mesh.AddLine('z', [-SimBox[2], SimBox[2]]        )
 
 AM.GenMesh(CSX, global_mesh_setup,primitives_mesh_setup,properties_mesh_setup)
 

@@ -76,10 +76,10 @@ mesh_res = C0/(f0+fc)/1e-3/20
 
 global_mesh_setup = {
     'dirs': 'xy',
-    'mesh_resolution': 'medium',
+    'mesh_resolution': 'high',
     'drawing_unit': 1e-3,
     #  'max_cellsize': mesh_res*3,
-     'min_cellsize': mesh_res/155,
+    'min_cellsize': mesh_res/10,
     'f0' : f0,
     'fc' : fc,
 }
@@ -162,11 +162,11 @@ x= [-20,  12, 12, -14, -14, -8,-8, gap,  gap, 20,  20, -20, -20]
 y= [20 ,  20, -1, -7, -16, -16,-10,  -2,   -2, -2, -20, -20, 20]
 
 # Generate a circle using polygon with x and y coordinates
-circle_radius = 10
+circle_radius = 20
 num_points = 50
 theta = np.linspace(0, 2 * np.pi, num_points)
-# x = circle_radius * np.cos(theta)
-# y = circle_radius * np.sin(theta)
+x = circle_radius * np.cos(theta)
+y = circle_radius * np.sin(theta)
 
 
 # x =[-20,-20,0,20,20,-8,-8,-20]
