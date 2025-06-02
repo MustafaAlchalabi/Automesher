@@ -433,6 +433,14 @@ pts_y = r_[pts_y, 268.370]
 pts_x = r_[pts_x, 11.850]
 pts_y = r_[pts_y, 268.370]
 
+diameter = 22.600-11.850
+radius = diameter/2.0
+# create a circle for the via
+theta = np.linspace(0, 2*np.pi, 50)
+pts_x = radius * np.cos(theta) + (11.850 + radius)
+pts_y = radius * np.sin(theta) + (257.620 + radius)
+# ensure the circle is closed by adding the first point at the end
+
 pts = np.array([pts_x, pts_y])
 polygon7 = TopVia2.AddLinPoly(priority=100, points=pts, norm_dir ='z', elevation=TopVia2_zmin, length=TopVia2_thick)
 primitives_mesh_setup[polygon7] = mesh_hint
@@ -463,8 +471,19 @@ pts_y = r_[pts_y, 56.370]
 pts_x = r_[pts_x, 22.820]
 pts_y = r_[pts_y, 56.370]
 
+diameter = 33.570-22.820
+radius = diameter/2.0
+# create a circle for the via
+theta = np.linspace(0, 2*np.pi, 50)
+pts_x = radius * np.cos(theta) + (22.820 + radius)
+pts_y = radius * np.sin(theta) + (45.620 + radius)
+# ensure the circle is closed by adding the first point at the end
+pts_x = np.r_[pts_x, pts_x[0]]
+pts_y = np.r_[pts_y, pts_y[0]]
+# create a polygon from the circle points
+
 pts = np.array([pts_x, pts_y])
-polygon9 = TopVia2.AddLinPoly(priority=100, points=pts, norm_dir ='z', elevation=TopVia2_zmin, length=TopVia2_thick)
+polygon9 = TopVia2.AddLinPoly(priority=50, points=pts, norm_dir ='z', elevation=TopVia2_zmin, length=TopVia2_thick)
 primitives_mesh_setup[polygon9] = mesh_hint
 
 # Bounding box of geometry
@@ -599,7 +618,8 @@ global_mesh_setup = {
     'drawing_unit': unit,
     'start_frequency': fstart,
     'stop_frequency': fstop,
-    'mesh_resolution': 'very_high',
+    'mesh_resolution': 'medium',
+    'use_circle_detection': True, 
     # 'refined_cellsize': 10,
     # 'min_cellsize': 0.5,
     # 'num_lines': 3,

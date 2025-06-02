@@ -76,10 +76,11 @@ mesh_res = C0/(f0+fc)/1e-3/20
 
 global_mesh_setup = {
     'dirs': 'xy',
-    'mesh_resolution': 'high',
+    'mesh_resolution': 'medium',
     'drawing_unit': 1e-3,
+    'use_circle_detection': True,
     #  'max_cellsize': mesh_res*3,
-    'min_cellsize': mesh_res/10,
+    # 'min_cellsize': mesh_res/10,
     'f0' : f0,
     'fc' : fc,
 }

@@ -26,8 +26,8 @@ class Automesher:
         unique_primitives = list(self.primitives_mesh_setup.keys())
         unique_properties = list(self.properties_mesh_setup.keys())
         only_edges = []
-        for primitive, mesh_hint in self.primitives_mesh_setup.items():
-            if mesh_hint.get('edges_only', False):
+        for primitive, mesh_setup in self.primitives_mesh_setup.items():
+            if mesh_setup.get('edges_only', False):
                 unique_primitives.remove(primitive)
                 only_edges.append(primitive)
         if only_edges:
@@ -41,7 +41,7 @@ class Automesher:
         else:
             self.collect_mesh_data_for_multiple_primitives(unique_primitives, **kw)
 
-        self.create_mesh_lines(grid)
+        self.add_mesh_lines(grid)
 
         lines = self.process_mesh_lines(grid)
 
@@ -49,34 +49,34 @@ class Automesher:
             grid.AddLine(i, lines[i][0])
 
     def collect_mesh_data_for_multiple_primitives(self, primitives, **kw):
-        hint = None
-        (hint,dirs,metal_edge_res) = self.get_mesh_hint(primitives,  **kw)
-        if hint is not None:
-            self.mesh_data[tuple(primitives)] = (hint,dirs,metal_edge_res)
+        mesh_data = None
+        (mesh_data,dirs,metal_edge_res) = self.get_mesh_data(primitives,  **kw)
+        if mesh_data is not None:
+            self.mesh_data[tuple(primitives)] = (mesh_data,dirs,metal_edge_res)
 
     def collect_mesh_data(self, primitive, **kw):
-        hint = None
+        mesh_data = None
         if primitive.GetType() == CSPrimitives.POLYGON:
-            (hint,dirs,metal_edge_res) = self.get_mesh_hint(primitive, **kw)
+            (mesh_data,dirs,metal_edge_res) = self.get_mesh_data(primitive, **kw)
         elif primitive.GetType() == CSPrimitives.LINPOLY:
-            (hint,dirs,metal_edge_res) = self.get_mesh_hint(primitive, **kw)
+            (mesh_data,dirs,metal_edge_res) = self.get_mesh_data(primitive, **kw)
         
-        if hint is not None:
-            self.mesh_data[primitive] = (hint,dirs,metal_edge_res)
+        if mesh_data is not None:
+            self.mesh_data[primitive] = (mesh_data,dirs,metal_edge_res)
 
-    def create_mesh_lines(self, grid):
+    def add_mesh_lines(self, grid):
         for primitive in self.mesh_data:
             for n in range(3):
                 if self.mesh_data[primitive][0][n]:
                     grid.AddLine(n, self.mesh_data[primitive][0][n])
 
-    def get_mesh_hint(self, polygon, **kw):
+    def get_mesh_data(self, polygon, **kw):
 
-        # Initialize the hint list for x, y, and z directions
-        hint = [[], [], []]
+        # Initialize the mesh_data list for x, y, and z directions
+        mesh_data = [[], [], []]
 
         # Initialize lists to store edges and coordinates
-        otheredges = []
+        diagonal_edges = []
         xedges, yedges = [], []
         x, y= [], []
 
@@ -84,13 +84,13 @@ class Automesher:
         if isinstance(polygon, list):
             # Process each primitive
             for prim in polygon:
-                self.process_primitive(prim, x, y, xedges, yedges, otheredges)
+                self.process_primitive(prim, x, y, xedges, yedges, diagonal_edges)
 
             # Collect z-coordinates from the polygon
             z = self.collect_z_coordinates(polygon)
 
-            # Process z-coordinates and add them to the hint list
-            self.process_z_coordinates(z, hint)
+            # Process z-coordinates and add them to the mesh_data list
+            self.process_z_coordinates(z, mesh_data)
 
             # Get the mesh setup parameters
             dirs = self.global_mesh_setup.get('dirs')
@@ -102,13 +102,13 @@ class Automesher:
             x, y = polygon.GetCoords()[0], polygon.GetCoords()[1]
 
             # Process the single polygon to extract edges and coordinates
-            self.process_single_polygon(polygon,x, y, xedges, yedges, otheredges)
+            self.process_single_polygon(polygon,x, y, xedges, yedges, diagonal_edges)
 
            # Collect z-coordinates from the single polygon 
             z = self.collect_z_coordinates([polygon])
 
-            # Process z-coordinates and add them to the hint
-            self.process_z_coordinates(z, hint)
+            # Process z-coordinates and add them to the mesh_data
+            self.process_z_coordinates(z, mesh_data)
             dirs = self.global_mesh_setup.get('dirs')
             # metal_edge_res = self.primitives_mesh_setup.get(polygon, {}).get('metal_edge_res') or \
             #                 self.properties_mesh_setup.get(polygon.GetProperty(), {}).get('metal_edge_res') or \
@@ -120,7 +120,9 @@ class Automesher:
 
         # Get unique vertical and horizontal edges
         unique_xedges, unique_yedges = self.get_unique_edges(xedges), self.get_unique_edges(yedges)
-        
+
+        self.found_circles = self.detect_all_circles_in_polygon(polygon)
+
         print ('min_cellsize:', self.min_cellsize)
         print ('mesh_res:', self.mesh_res)
         print('num_lines:', self.num_lines) 
@@ -157,6 +159,8 @@ class Automesher:
             if self.max_cellsize == self.mesh_res:
                 self.max_cellsize = self.mesh_res * 2
 
+        self.check_max_resolution(diagonal_edges, unique_xedges, unique_yedges, self.mesh_res, self.max_res, mesh_data)
+
         print ('min_cellsize:', self.min_cellsize)
         print ('mesh_res:', self.mesh_res)
         print('num_lines:', self.num_lines) 
@@ -167,13 +171,13 @@ class Automesher:
         sorted_x, sorted_y = np.sort(x), np.sort(y)
 
         # Handle diagonal edges and add mesh lines for x and y directions
-        self.handle_otheredges(otheredges, unique_xedges, unique_yedges, self.mesh_res, self.max_res, hint[0], 'x')
-        self.handle_otheredges(otheredges, unique_xedges, unique_yedges, self.mesh_res, self.max_res, hint[1], 'y')
-        
+        self.handle_otheredges(diagonal_edges, unique_xedges, unique_yedges, self.mesh_res, self.max_res, mesh_data[0], 'x')
+        self.handle_otheredges(diagonal_edges, unique_xedges, unique_yedges, self.mesh_res, self.max_res, mesh_data[1], 'y')
+
         # Refine mesh in small gaps for x and y edges
-        self.mesh_small_gaps(xedges, self.mesh_res, self.max_res, self.num_lines, hint, 'x')
-        self.mesh_small_gaps(yedges, self.mesh_res, self.max_res, self.num_lines, hint, 'y')
-        self.mesh_small_gaps(z, self.mesh_res, self.max_res, self.num_lines, hint, 'z')
+        self.mesh_small_gaps(xedges, self.mesh_res, self.max_res, self.num_lines, mesh_data, 'x')
+        self.mesh_small_gaps(yedges, self.mesh_res, self.max_res, self.num_lines, mesh_data, 'y')
+        self.mesh_small_gaps(z, self.mesh_res, self.max_res, self.num_lines, mesh_data, 'z')
         
         # Recalculate unique edges after refinement 
         unique_xedges, unique_yedges = self.get_unique_edges(xedges), self.get_unique_edges(yedges)
@@ -183,30 +187,33 @@ class Automesher:
         yedges.sort(key=lambda edge: edge[0])   
 
         # Add missing mesh lines between points and edges for x and y directions
-        self.add_missing_mesh_lines(unique_xedges, sorted_x, otheredges, self.mesh_res, hint[0], 'x')
-        self.add_missing_mesh_lines(unique_yedges, sorted_y, otheredges, self.mesh_res, hint[1], 'y')
+        self.add_missing_mesh_lines(unique_xedges, sorted_x, diagonal_edges, self.mesh_res, mesh_data[0], 'x')
+        self.add_missing_mesh_lines(unique_yedges, sorted_y, diagonal_edges, self.mesh_res, mesh_data[1], 'y')
         
-        # Add edges to the mesh hint for x and y directions
-        self.add_edges_to_mesh_hint(hint[0], xedges, self.mesh_res, self.min_cellsize, 'x')
-        self.add_edges_to_mesh_hint(hint[1], yedges, self.mesh_res, self.min_cellsize, 'y')
+        # Add edges to the mesh mesh_data for x and y directions
+        self.add_edges_to_mesh_mesh_data(mesh_data[0], xedges, self.mesh_res, self.min_cellsize, 'x')
+        self.add_edges_to_mesh_mesh_data(mesh_data[1], yedges, self.mesh_res, self.min_cellsize, 'y')
 
         # Add graded meshlines at material transitions
-        self.add_graded_mesh_lines_at_material_transitions(xedges,hint[0], self.mesh_res)
-        self.add_graded_mesh_lines_at_material_transitions(yedges,hint[1], self.mesh_res)
+        self.add_graded_mesh_lines_at_material_transitions(xedges,mesh_data[0], self.mesh_res)
+        self.add_graded_mesh_lines_at_material_transitions(yedges,mesh_data[1], self.mesh_res)
         z = [(z[0], None, None, z[1]) for z in z]
-        self.add_graded_mesh_lines_at_material_transitions(z,hint[2], self.mesh_res)
+        self.add_graded_mesh_lines_at_material_transitions(z,mesh_data[2], self.mesh_res)
 
-        # self.metal_edge(xedges, polygon, self.mesh_res, hint[0], dirs, metal_edge_res, 'x')
-        # self.metal_edge(yedges, polygon, self.mesh_res, hint[1], dirs, metal_edge_res, 'y')
+        # Handle circular segments in the polygon
+        self.handle_circular_segments(polygon, mesh_data)
+        
+        # self.metal_edge(xedges, polygon, self.mesh_res, mesh_data[0], dirs, metal_edge_res, 'x')
+        # self.metal_edge(yedges, polygon, self.mesh_res, mesh_data[1], dirs, metal_edge_res, 'y')
     
         if list(self.mesh_data.values()):
-            hint[0].extend(list(self.mesh_data.values())[0][0][0])
-            hint[1].extend(list(self.mesh_data.values())[0][0][1])
-            hint[2].extend(list(self.mesh_data.values())[0][0][2])
+            mesh_data[0].extend(list(self.mesh_data.values())[0][0][0])
+            mesh_data[1].extend(list(self.mesh_data.values())[0][0][1])
+            mesh_data[2].extend(list(self.mesh_data.values())[0][0][2])
         # Smooth the mesh lines for x, y, and z directions if edges_only is not set
-        hint[0] = sorted(hint[0])
-        hint[1] = sorted(hint[1])
-        hint[2] = sorted(hint[2])
+        mesh_data[0] = sorted(mesh_data[0])
+        mesh_data[1] = sorted(mesh_data[1])
+        mesh_data[2] = sorted(mesh_data[2])
         mesh_with_max_cell_size = [[], [], []] 
         mesh_with_different_mesh_res = []
 
@@ -228,26 +235,26 @@ class Automesher:
                             if len(same_prim_edges_x) > 1:
                                 same_prim_edges_x.sort(key=lambda edge: edge[0])
                                 for j in range(len(same_prim_edges_x) - 1):
-                                    lines_in_range = [line for line in hint[0] if same_prim_edges_x[j][0] <= line <= same_prim_edges_x[j + 1][0]]
+                                    lines_in_range = [line for line in mesh_data[0] if same_prim_edges_x[j][0] <= line <= same_prim_edges_x[j + 1][0]]
                                     if lines_in_range:
                                         resolution = mesh_with_different_mesh_res[0][0]
-                                        hint[0] = SmoothMeshLines(lines_in_range, resolution).tolist()
+                                        mesh_data[0] = SmoothMeshLines(lines_in_range, resolution).tolist()
                         if same_prim_edges_y:
                             if len(same_prim_edges_y) > 1:
                                 same_prim_edges_y.sort(key=lambda edge: edge[0])
                                 for j in range(len(same_prim_edges_y) - 1):
-                                    lines_in_range = [line for line in hint[1] if same_prim_edges_y[j][0] <= line <= same_prim_edges_y[j + 1][0]]
+                                    lines_in_range = [line for line in mesh_data[1] if same_prim_edges_y[j][0] <= line <= same_prim_edges_y[j + 1][0]]
                                     if lines_in_range:
                                         resolution = mesh_with_different_mesh_res[0][0]
-                                        hint[1] = SmoothMeshLines(lines_in_range, resolution).tolist()
+                                        mesh_data[1] = SmoothMeshLines(lines_in_range, resolution).tolist()
                         if same_prim_edges_z:
                             if len(same_prim_edges_z) > 1:
                                 same_prim_edges_z.sort(key=lambda edge: edge[0])
                                 for j in range(len(same_prim_edges_z) - 1):
-                                    lines_in_range = [line for line in hint[2] if same_prim_edges_z[j][0] <= line <= same_prim_edges_z[j + 1][0]]
+                                    lines_in_range = [line for line in mesh_data[2] if same_prim_edges_z[j][0] <= line <= same_prim_edges_z[j + 1][0]]
                                     if lines_in_range:
                                         resolution = mesh_with_different_mesh_res[0][0]
-                                        hint[2] = SmoothMeshLines(lines_in_range, resolution).tolist()
+                                        mesh_data[2] = SmoothMeshLines(lines_in_range, resolution).tolist()
 
                     if len(mesh_with_different_mesh_res) > 1:
                         mesh_with_different_mesh_res.sort(key=lambda x: x[0])
@@ -259,184 +266,190 @@ class Automesher:
                                 if len(same_prim_edges_x) > 1:
                                     same_prim_edges_x.sort(key=lambda edge: edge[0])
                                     for j in range(len(same_prim_edges_x) - 1):
-                                        lines_in_range = [line for line in hint[0] if same_prim_edges_x[j][0] <= line <= same_prim_edges_x[j + 1][0]]
+                                        lines_in_range = [line for line in mesh_data[0] if same_prim_edges_x[j][0] <= line <= same_prim_edges_x[j + 1][0]]
                                         if lines_in_range:
                                             resolution = mesh_with_different_mesh_res[i][0]
-                                            hint[0] = SmoothMeshLines(lines_in_range, resolution).tolist()
+                                            mesh_data[0] = SmoothMeshLines(lines_in_range, resolution).tolist()
                             if same_prim_edges_y:
                                 if len(same_prim_edges_y) > 1:
                                     same_prim_edges_y.sort(key=lambda edge: edge[0])
                                     for j in range(len(same_prim_edges_y) - 1):
-                                        lines_in_range = [line for line in hint[1] if same_prim_edges_y[j][0] <= line <= same_prim_edges_y[j + 1][0]]
+                                        lines_in_range = [line for line in mesh_data[1] if same_prim_edges_y[j][0] <= line <= same_prim_edges_y[j + 1][0]]
                                         if lines_in_range:
                                             resolution = mesh_with_different_mesh_res[i][0]
-                                            hint[1] = SmoothMeshLines(lines_in_range, resolution).tolist()
+                                            mesh_data[1] = SmoothMeshLines(lines_in_range, resolution).tolist()
                             if same_prim_edges_z:
                                 if len(same_prim_edges_z) > 1:
                                     same_prim_edges_z.sort(key=lambda edge: edge[0])
                                     for j in range(len(same_prim_edges_z) - 1):
-                                        lines_in_range = [line for line in hint[2] if same_prim_edges_z[j][0] <= line <= same_prim_edges_z[j + 1][0]]
+                                        lines_in_range = [line for line in mesh_data[2] if same_prim_edges_z[j][0] <= line <= same_prim_edges_z[j + 1][0]]
                                         if lines_in_range:
                                             resolution = mesh_with_different_mesh_res[i][0]
-                                            hint[2] = SmoothMeshLines(lines_in_range, resolution).tolist()
+                                            mesh_data[2] = SmoothMeshLines(lines_in_range, resolution).tolist()
 
             if not any (self.primitives_mesh_setup.get(prim, {}).get('edges_only', False) for prim in polygon):
-                for i in range(len(hint[0]) - 1):
-                    if hint[0][i+1] - hint[0][i] > self.max_cellsize/2:
-                        mesh_with_max_cell_size[0].append((hint[0][i], hint[0][i+1]))
-                for i in range(len(hint[1]) - 1):
-                    if hint[1][i+1] - hint[1][i] > self.max_cellsize/2:
-                        mesh_with_max_cell_size[1].append((hint[1][i], hint[1][i+1]))
-                for i in range(len(hint[2]) - 1):
-                    if hint[2][i+1] - hint[2][i] > self.max_cellsize/2:
-                        mesh_with_max_cell_size[2].append((hint[2][i], hint[2][i+1]))
+                for i in range(len(mesh_data[0]) - 1):
+                    if mesh_data[0][i+1] - mesh_data[0][i] > self.max_cellsize/2:
+                        mesh_with_max_cell_size[0].append((mesh_data[0][i], mesh_data[0][i+1]))
+                for i in range(len(mesh_data[1]) - 1):
+                    if mesh_data[1][i+1] - mesh_data[1][i] > self.max_cellsize/2:
+                        mesh_with_max_cell_size[1].append((mesh_data[1][i], mesh_data[1][i+1]))
+                for i in range(len(mesh_data[2]) - 1):
+                    if mesh_data[2][i+1] - mesh_data[2][i] > self.max_cellsize/2:
+                        mesh_with_max_cell_size[2].append((mesh_data[2][i], mesh_data[2][i+1]))
 
-                hint[0] = SmoothMeshLines(hint[0], self.mesh_res).tolist()    
-                hint[1] = SmoothMeshLines(hint[1], self.mesh_res).tolist()
-                hint[2] = SmoothMeshLines(hint[2], self.mesh_res).tolist()
+                mesh_data[0] = SmoothMeshLines(mesh_data[0], self.mesh_res).tolist()    
+                mesh_data[1] = SmoothMeshLines(mesh_data[1], self.mesh_res).tolist()
+                mesh_data[2] = SmoothMeshLines(mesh_data[2], self.mesh_res).tolist()
 
                 for i in range(3):
                     for start, end in mesh_with_max_cell_size[i]:
-                        hint[i] = [line for line in hint[i] if not (start < line < end)]
+                        mesh_data[i] = [line for line in mesh_data[i] if not (start < line < end)]
 
         else:
             if not self.primitives_mesh_setup.get(polygon, {}).get('edges_only', False):
-                for i in range(len(hint[0]) - 1):
-                    if hint[0][i+1] - hint[0][i] > self.max_cellsize/2:
-                        mesh_with_max_cell_size[0].append((hint[0][i], hint[0][i+1]))
-                for i in range(len(hint[1]) - 1):
-                    if hint[1][i+1] - hint[1][i] > self.max_cellsize/2:
-                        mesh_with_max_cell_size[1].append((hint[1][i], hint[1][i+1]))
-                for i in range(len(hint[2]) - 1):
-                    if hint[2][i+1] - hint[2][i] > self.max_cellsize/2:
-                        mesh_with_max_cell_size[2].append((hint[2][i], hint[2][i+1]))
+                for i in range(len(mesh_data[0]) - 1):
+                    if mesh_data[0][i+1] - mesh_data[0][i] > self.max_cellsize/2:
+                        mesh_with_max_cell_size[0].append((mesh_data[0][i], mesh_data[0][i+1]))
+                for i in range(len(mesh_data[1]) - 1):
+                    if mesh_data[1][i+1] - mesh_data[1][i] > self.max_cellsize/2:
+                        mesh_with_max_cell_size[1].append((mesh_data[1][i], mesh_data[1][i+1]))
+                for i in range(len(mesh_data[2]) - 1):
+                    if mesh_data[2][i+1] - mesh_data[2][i] > self.max_cellsize/2:
+                        mesh_with_max_cell_size[2].append((mesh_data[2][i], mesh_data[2][i+1]))
 
-                hint[0] = SmoothMeshLines(hint[0], self.mesh_res).tolist()    
-                hint[1] = SmoothMeshLines(hint[1], self.mesh_res).tolist()
-                hint[2] = SmoothMeshLines(hint[2], self.mesh_res).tolist()
+                mesh_data[0] = SmoothMeshLines(mesh_data[0], self.mesh_res).tolist()    
+                mesh_data[1] = SmoothMeshLines(mesh_data[1], self.mesh_res).tolist()
+                mesh_data[2] = SmoothMeshLines(mesh_data[2], self.mesh_res).tolist()
 
                 for i in range(3):
                     for start, end in mesh_with_max_cell_size[i]:
-                        hint[i] = [line for line in hint[i] if not (start < line < end)]
-            if self.is_circle_in_polygon(polygon, return_segment = True):
-                circles = [None,None,None]
-                circles = self.is_circle_in_polygon(polygon, return_segment = True)
-                max_x = max(circles[1])
-                min_x = min(circles[1])
-                max_y = max(circles[2])
-                min_y = min(circles[2])
-                print('max_x:', max_x, 'min_x:', min_x, 'max_y:', max_y, 'min_y:', min_y)
-                for value in hint[0][:]:
-                    if min_x < value < max_x:
-                        hint[0].remove(value)
-                for value in hint[1][:]:
-                    if min_y < value < max_y:
-                        hint[1].remove(value)
-
-
-        # Process the hint to remove close points and refine the mesh        
+                        mesh_data[i] = [line for line in mesh_data[i] if not (start < line < end)]
+  
+        # Process the mesh_data to remove close points and refine the mesh        
         if self.global_mesh_setup.get('min_cellsize', None) is not None or min_cellsize_changed:
-            hint[0] = self.process_hint(hint[0], self.min_cellsize, unique_xedges)
-            hint[1] = self.process_hint(hint[1], self.min_cellsize, unique_yedges)
-            hint[2] = self.process_hint(hint[2], self.min_cellsize, z)
+            mesh_data[0] = self.process_mesh_data(mesh_data[0], self.min_cellsize, unique_xedges)
+            mesh_data[1] = self.process_mesh_data(mesh_data[1], self.min_cellsize, unique_yedges)
+            mesh_data[2] = self.process_mesh_data(mesh_data[2], self.min_cellsize, z)
         
-        # Add Ports to the hint
-        hint[0] = self.add_ports_to_hint(hint[0], xedges, 'x')
-        hint[1] = self.add_ports_to_hint(hint[1], yedges, 'y')
-        hint[2] = self.add_ports_to_hint(hint[2], z, 'z')
+        # Add Ports to the mesh_data
+        mesh_data[0] = self.add_ports_to_mesh_data(mesh_data[0], xedges, 'x')
+        mesh_data[1] = self.add_ports_to_mesh_data(mesh_data[1], yedges, 'y')
+        mesh_data[2] = self.add_ports_to_mesh_data(mesh_data[2], z, 'z')
 
-        # If no z-direction hints exist, set it to None
-        if hint[2] == []:
-            hint[2] = None
+        # Chech if all edges are in the mesh_data
+        self.add_edges_to_mesh_mesh_data(mesh_data[0], xedges, self.mesh_res, self.min_cellsize, 'x')
+        self.add_edges_to_mesh_mesh_data(mesh_data[1], yedges, self.mesh_res, self.min_cellsize, 'y')
+        # self.add_edges_to_mesh_mesh_data(mesh_data[2], z, self.mesh_res, self.min_cellsize, 'z')
 
-        # Initialize the final hint with None for all directions
-        realhint = [None, None, None]
+        # Check the lines between edges
+        # self.check_lines_between_edges(mesh_data, xedges, yedges, z)
 
-       # Assign hints to the appropriate directions based on global setup 
+        # If no z-direction mesh_datas exist, set it to None
+        if mesh_data[2] == []:
+            mesh_data[2] = None
+
+        # Initialize the final mesh_data with None for all directions
+        realmesh_data = [None, None, None]
+
+       # Assign mesh_datas to the appropriate directions based on global setup 
         if dirs is not None:
             for ny in GetMultiDirs(dirs):
-                realhint[ny] = hint[ny] 
+                realmesh_data[ny] = mesh_data[ny] 
 
         metal_edge_res = None
 
-        return (realhint, dirs, metal_edge_res)
+        return (realmesh_data, dirs, metal_edge_res)
     
-    def handle_otheredges(self, otheredges, unique_xedges, unique_yedges, mesh_res, max_res, hint, direction):
+    def handle_otheredges(self, otheredges, unique_xedges, unique_yedges, mesh_res, max_res, mesh_data, direction, check_max_resolution=False):
+        
         diagonal_edges = otheredges
-        other_edges_in_range = []
-        if direction == 'x':
-            unique_edges = self.remove_close_unique_edges(unique_xedges, max_res)
-            unique_edges = [unique_xedges[0] for unique_xedges in unique_edges]
-
-        if direction == 'y':
-            unique_edges = self.remove_close_unique_edges(unique_yedges, max_res)
-            unique_edges = [unique_yedges[0] for unique_yedges in unique_edges]
-        for edge in diagonal_edges:            
+        if not check_max_resolution:
+            other_edges_in_range = []
             if direction == 'x':
-                start , end = edge[0], edge[1]
-                other_edges_in_range = [other_edge for other_edge in diagonal_edges if (start <= other_edge[0] <= end or start <= other_edge[1] <= end or start >= other_edge[0] >= end or start >= other_edge[1] >= end)]
+                unique_edges = self.remove_close_unique_edges(unique_xedges, max_res)
+                unique_edges = [unique_xedges[0] for unique_xedges in unique_edges]
+
             if direction == 'y':
-                start , end = edge[2], edge[3]
-                other_edges_in_range = [other_edge for other_edge in diagonal_edges if (start <= other_edge[2] <= end or start <= other_edge[3] <= end or start >= other_edge[2] >= end or start >= other_edge[3] >= end)]
-            x_start, x_end, y_start, y_end, prim = edge
-            lines_in_range = [direction for direction in unique_edges if start <= direction <= end or start >= direction >= end]
-
-            if not other_edges_in_range:
-                alpha = np.atan(abs((y_end-y_start))/abs((x_end-x_start)))
-                resolution = mesh_res * np.cos(alpha)
-                if not lines_in_range:
-                    lines=SmoothMeshLines([start, end], resolution)    
-                if lines_in_range:
-                    lines_in_range.extend([start, end])
-                    lines=SmoothMeshLines(lines_in_range, resolution)
-                hint.extend(lines)
-            if other_edges_in_range:
-                alpha = np.round(np.rad2deg(np.atan(abs((y_end-y_start))/abs((x_end-x_start)))),2)
+                unique_edges = self.remove_close_unique_edges(unique_yedges, max_res)
+                unique_edges = [unique_yedges[0] for unique_yedges in unique_edges]
+            for edge in diagonal_edges:            
                 if direction == 'x':
-                    other_edges_in_range_here = [other_edge[0:2] for other_edge in other_edges_in_range]
-                    resolution = mesh_res * np.cos(np.deg2rad(alpha))
-                    other_edges_in_range_here_all_coords = [other_edge for other_edge in other_edges_in_range if (start <= other_edge[0] <= end or start <= other_edge[1] <= end or start >= other_edge[0] >= end or start >= other_edge[1] >= end)]
+                    start , end = edge[0], edge[1]
+                    other_edges_in_range = [other_edge for other_edge in diagonal_edges if (start <= other_edge[0] <= end or start <= other_edge[1] <= end or start >= other_edge[0] >= end or start >= other_edge[1] >= end)]
                 if direction == 'y':
-                    other_edges_in_range_here = [other_edge[2:4] for other_edge in other_edges_in_range]
-                    resolution = mesh_res * np.sin(np.deg2rad(alpha))
-                    other_edges_in_range_here_all_coords = [other_edge for other_edge in other_edges_in_range if (start <= other_edge[2] <= end or start <= other_edge[3] <= end or start >= other_edge[2] >= end or start >= other_edge[3] >= end)]
-                min_line = np.min([start,end, np.min(np.min(other_edges_in_range_here))])
-                max_line = np.max([start,end, np.max(np.max(other_edges_in_range_here))])
-                alphas_in_range = [(np.round(np.rad2deg(np.atan(abs((edge[3] - edge[2])) / abs((edge[1] - edge[0])))),2), edge) for edge in other_edges_in_range_here_all_coords]
-                lines_in_hint_range = [direction for direction in hint if min_line <= direction <= max_line] 
-                for line in lines_in_hint_range:
-                    hint.remove(line)
+                    start , end = edge[2], edge[3]
+                    other_edges_in_range = [other_edge for other_edge in diagonal_edges if (start <= other_edge[2] <= end or start <= other_edge[3] <= end or start >= other_edge[2] >= end or start >= other_edge[3] >= end)]
+                x_start, x_end, y_start, y_end, prim = edge
+                lines_in_range = [direction for direction in unique_edges if start <= direction <= end or start >= direction >= end]
 
-                lines_in_range = [direction for direction in unique_edges if min_line < direction < max_line]
-                if lines_in_range:
-                    lines_in_range.extend([min_line, max_line])  
-                    lines=SmoothMeshLines(lines_in_range, resolution)
-                if not lines_in_range:
-                    lines=SmoothMeshLines([min_line,max_line], resolution)
-                hint.extend(lines)
-                if direction == 'x':
-                    for alpha_val, edge in alphas_in_range:
-                        if alpha_val > alpha:
-                            lines_in_hint_range = [line for line in hint if edge[0] <= line <= edge[1] or edge[0] >= line >= edge[1]]
-                            for line in lines_in_hint_range:
-                                hint.remove(line)
-                            resolution = mesh_res * np.cos(np.deg2rad(alpha_val))
-                            xlines = SmoothMeshLines([edge[0], edge[1]], resolution)
-                            hint.extend(xlines)
-                if direction == 'y':
-                    for alpha_val, edge in alphas_in_range:
-                        if alpha_val < alpha:
-                            lines_in_hint_range = [line for line in hint if edge[2] <= line <= edge[3] or edge[2] >= line >= edge[3]]
-                            for line in lines_in_hint_range:
-                                hint.remove(line)
-                            resolution = mesh_res * np.sin(np.deg2rad(alpha_val))
-
-                            ylines = SmoothMeshLines([edge[2], edge[3]], abs(resolution))
-                            hint.extend(ylines)
-        if direction == 'x':
-            diagonal_edges.sort(key=lambda edge: edge[0])
-        if direction == 'y':
-            diagonal_edges.sort(key=lambda edge: edge[2])
+                if not other_edges_in_range:
+                    alpha = np.atan(abs((y_end-y_start))/abs((x_end-x_start)))
+                    resolution = mesh_res * np.cos(alpha)
+                    resolution = self.max_res if resolution < self.max_res else resolution
+                    if not lines_in_range:
+                        lines=SmoothMeshLines([start, end], resolution)    
+                    if lines_in_range:
+                        lines_in_range.extend([start, end])
+                        lines=SmoothMeshLines(lines_in_range, resolution)
+                    mesh_data.extend(lines)
+                if other_edges_in_range:
+                    alpha = np.round(np.rad2deg(np.atan(abs((y_end-y_start))/abs((x_end-x_start)))),2)
+                    if direction == 'x':
+                        other_edges_in_range_here = [other_edge[0:2] for other_edge in other_edges_in_range]
+                        resolution = mesh_res * np.cos(np.deg2rad(alpha))
+                        other_edges_in_range_here_all_coords = [other_edge for other_edge in other_edges_in_range if (start <= other_edge[0] <= end or start <= other_edge[1] <= end or start >= other_edge[0] >= end or start >= other_edge[1] >= end)]
+                    if direction == 'y':
+                        other_edges_in_range_here = [other_edge[2:4] for other_edge in other_edges_in_range]
+                        resolution = mesh_res * np.sin(np.deg2rad(alpha))
+                        other_edges_in_range_here_all_coords = [other_edge for other_edge in other_edges_in_range if (start <= other_edge[2] <= end or start <= other_edge[3] <= end or start >= other_edge[2] >= end or start >= other_edge[3] >= end)]
+                    min_line = np.min([start,end, np.min(np.min(other_edges_in_range_here))])
+                    max_line = np.max([start,end, np.max(np.max(other_edges_in_range_here))])
+                    alphas_in_range = [(np.round(np.rad2deg(np.atan(abs((edge[3] - edge[2])) / abs((edge[1] - edge[0])))),2), edge) for edge in other_edges_in_range_here_all_coords]
+                    lines_in_mesh_data_range = [direction for direction in mesh_data if min_line <= direction <= max_line] 
+                    for line in lines_in_mesh_data_range:
+                        mesh_data.remove(line)
+                    if resolution < self.max_res:
+                        resolution = self.max_res
+                    lines_in_range = [direction for direction in unique_edges if min_line < direction < max_line]
+                    if lines_in_range:
+                        lines_in_range.extend([min_line, max_line])  
+                        lines=SmoothMeshLines(lines_in_range, resolution)
+                    if not lines_in_range:
+                        lines=SmoothMeshLines([min_line,max_line], resolution)
+                    mesh_data.extend(lines)
+                    if direction == 'x':
+                        for alpha_val, edge in alphas_in_range:
+                            if alpha_val > alpha:
+                                lines_in_mesh_data_range = [line for line in mesh_data if edge[0] <= line <= edge[1] or edge[0] >= line >= edge[1]]
+                                for line in lines_in_mesh_data_range:
+                                    mesh_data.remove(line)
+                                resolution = mesh_res * np.cos(np.deg2rad(alpha_val))
+                                resolution = self.max_res if resolution < self.max_res else resolution
+                                xlines = SmoothMeshLines([edge[0], edge[1]], resolution)
+                                mesh_data.extend(xlines)
+                    if direction == 'y':
+                        for alpha_val, edge in alphas_in_range:
+                            if alpha_val < alpha:
+                                lines_in_mesh_data_range = [line for line in mesh_data if edge[2] <= line <= edge[3] or edge[2] >= line >= edge[3]]
+                                for line in lines_in_mesh_data_range:
+                                    mesh_data.remove(line)
+                                resolution = mesh_res * np.sin(np.deg2rad(alpha_val))
+                                resolution = self.max_res if resolution < self.max_res else resolution
+                                ylines = SmoothMeshLines([edge[2], edge[3]], abs(resolution))
+                                mesh_data.extend(ylines)
+        circ_segments = []
+        do_sort = True
+        for edge in diagonal_edges:
+            circ_segments = self.detect_all_circles_in_polygon(edge[4])
+            if circ_segments:
+                do_sort = False
+        if do_sort:
+            if direction == 'x':
+                diagonal_edges.sort(key=lambda edge: edge[0])
+            if direction == 'y':
+                diagonal_edges.sort(key=lambda edge: edge[2])
+        dist = []
         for i in range(len(diagonal_edges)):
             for j in range(i + 1, len(diagonal_edges)):
                 line1 = diagonal_edges[i]
@@ -470,63 +483,115 @@ class Automesher:
                 p2 = np.array([line1[1], line1[3]])  # (x2, y2)
                 q1 = np.array([line2[0], line2[2]])  # (x1, y1)
                 q2 = np.array([line2[1], line2[3]])  # (x2, y2)
-                dist = self.distance_between_segments(p1, p2, q1, q2)
-                dist = [small_dist for small_dist in dist if small_dist[0] <= mesh_res]
+                distance = self.distance_between_segments(p1, p2, q1, q2)
+                distance = [small_dist for small_dist in distance if small_dist[0] <= mesh_res]
+                if distance:
+                    dist.append(distance)
                 alpha = np.round(np.rad2deg(np.atan(abs((q2[1] - q1[1]) / abs((q2[0] - q1[0]))))), 2)
                 if np.min(np.diff([line1[0:2], line2[0:2]])) > mesh_res or np.min(np.diff([line1[2:4], line2[2:4]])) > mesh_res:
                     continue
-                if dist:
-                    if direction == 'x':
-                        coords_of_p = [item[1][0] for item in dist]
-                        resolution = mesh_res * np.cos(np.deg2rad(alpha))
-                        start_and_end_points = [line1[0], line1[1], line2[0], line2[1]]
-                    if direction == 'y':
-                        coords_of_p = [item[1][1] for item in dist]
-                        resolution = mesh_res * np.sin(np.deg2rad(alpha))
-                        start_and_end_points = [line1[2], line1[3], line2[2], line2[3]]
-                    lines_in_range = [lines for lines in hint if np.min(coords_of_p) <= lines <= np.max(coords_of_p)]
-                    for line in lines_in_range:
-                        hint.remove(line)
-                    lines_before_min = [line for line in hint if line < np.min(coords_of_p) and abs(line - np.min(coords_of_p)) < max_res]
-                    lines_after_max = [line for line in hint if line > np.max(coords_of_p) and abs(line - np.max(coords_of_p)) < max_res]
+        if dist and check_max_resolution:
+            for dist0 in dist:
+                # discretize the distance with the number of lines and calculate the minimal distance between the lines for the maximum resolution
+                x = np.round(np.diff(np.linspace(0, np.min([item[0] for item in dist0]), self.num_lines)),1)
+                if np.min(x) < self.max_res and np.min(x) > 0:
+                    self.max_res = np.min(x)
 
-                    if lines_before_min and lines_after_max:
-                        min_line = min(min(lines_before_min), min(lines_after_max))
-                        max_line = max(max(lines_before_min), max(lines_after_max))
-                        lines = self.check_edges_in_range(unique_edges, min_line, max_line, start_and_end_points, max_res)
-                        hint.extend(lines)                        
-                    elif lines_before_min:
-                        min_line = min(min(lines_before_min), np.min(coords_of_p))
-                        max_line = max(max(lines_before_min), np.max(coords_of_p))
-                        lines = self.check_edges_in_range(unique_edges, min_line, max_line, start_and_end_points, max_res)
-                        hint.extend(lines)
-                    elif lines_after_max:
-                        min_line = min(min(lines_after_max), np.min(coords_of_p))
-                        max_line = max(max(lines_after_max), np.max(coords_of_p))
-                        lines = self.check_edges_in_range(unique_edges, min_line, max_line, start_and_end_points, max_res)
-                        hint.extend(lines)
-                    else:
-                        min_line = np.min(coords_of_p)
-                        max_line = np.max(coords_of_p)
-                        lines = self.check_edges_in_range(unique_edges, min_line, max_line, start_and_end_points, max_res)
-                        hint.extend(lines)
+        if dist and not check_max_resolution:    
+            for dist1 in dist:
+                if direction == 'x':
+                    coords_of_p = [item[1][0] for item in dist1]
+                    resolution = mesh_res * np.cos(np.deg2rad(alpha))
+                    # start_and_end_points = [line1[0], line1[1], line2[0], line2[1]]
+                    start_and_end_points = [dist1[0][2][0], dist1[0][3][0], dist1[0][4][0], dist1[0][5][0]]
+                if direction == 'y':
+                    coords_of_p = [item[1][1] for item in dist1]
+                    resolution = mesh_res * np.sin(np.deg2rad(alpha))
+                    # start_and_end_points = [line1[2], line1[3], line2[2], line2[3]]
+                    start_and_end_points = [dist1[0][2][1], dist1[0][3][1], dist1[0][4][1], dist1[0][5][1]]
+                lines_in_range = [lines for lines in mesh_data if np.min(coords_of_p) <= lines <= np.max(coords_of_p)]
+                for line in lines_in_range:
+                    mesh_data.remove(line)
+                lines_before_min = [line for line in mesh_data if line < np.min(coords_of_p) and abs(line - np.min(coords_of_p)) < max_res]
+                lines_after_max = [line for line in mesh_data if line > np.max(coords_of_p) and abs(line - np.max(coords_of_p)) < max_res]
 
-    def check_edges_in_range(self, unique_edges, min_line, max_line, start_and_end_points, resolution):
-        lines_in_range = [edge for edge in unique_edges if min_line < edge < max_line]
-        if lines_in_range:
-            lines_in_range.extend([min_line, max_line])
-            lines_in_range.extend(start_and_end_points)  
-            lines=SmoothMeshLines(lines_in_range, resolution)
-        if not lines_in_range:
-            lines_in_range.extend(start_and_end_points)
-            lines=SmoothMeshLines([min_line,max_line], resolution)
+                if lines_before_min and lines_after_max:
+                    min_line = min(min(lines_before_min), min(lines_after_max))
+                    max_line = max(max(lines_before_min), max(lines_after_max))
+                    lines = self.check_edges_in_range(unique_edges, min_line, max_line, start_and_end_points, mesh_data, max_res)
+                    mesh_data.extend(lines)                        
+                elif lines_before_min:
+                    min_line = min(min(lines_before_min), np.min(coords_of_p))
+                    max_line = max(max(lines_before_min), np.max(coords_of_p))
+                    lines = self.check_edges_in_range(unique_edges, min_line, max_line, start_and_end_points, mesh_data, max_res)
+                    mesh_data.extend(lines)
+                elif lines_after_max:
+                    min_line = min(min(lines_after_max), np.min(coords_of_p))
+                    max_line = max(max(lines_after_max), np.max(coords_of_p))
+                    lines = self.check_edges_in_range(unique_edges, min_line, max_line, start_and_end_points, mesh_data, max_res)
+                    mesh_data.extend(lines)
+                else:
+                    min_line = np.min(coords_of_p)
+                    max_line = np.max(coords_of_p)
+                    lines = self.check_edges_in_range(unique_edges, min_line, max_line, start_and_end_points, mesh_data, max_res)
+                    mesh_data.extend(lines)
+
+    def check_edges_in_range(self, unique_edges, min_line, max_line, start_and_end_points, mesh_data, resolution):
+        edges_in_range = [edge for edge in unique_edges if min_line < edge < max_line]
+        if edges_in_range:
+            lines_in_range = [line for line in mesh_data if min(min_line, max_line, min(start_and_end_points)) <= line <= max(min_line, max_line, max(start_and_end_points))]
+            if lines_in_range:
+                for line in lines_in_range:
+                    mesh_data.remove(line)
+            edges_in_range.extend([min_line, max_line])
+            edges_in_range.extend(start_and_end_points)  
+            lines=SmoothMeshLines(edges_in_range, resolution/1)
+        if not edges_in_range:
+            lines_in_range = [line for line in mesh_data if min(min_line, max_line) <= line <= max(min_line, max_line)]
+            if lines_in_range:
+                for line in lines_in_range:
+                    mesh_data.remove(line)
+            # edges_in_range.extend(start_and_end_points)
+            edges_in_range.extend([min_line, max_line])  
+            lines=SmoothMeshLines(edges_in_range, resolution/1)
         return lines
+    
+    def check_max_resolution(self, diagonal_edges, unique_xedges, unique_yedges, mesh_res, max_res, mesh_data):
+        # x-direction
+        self.handle_otheredges(diagonal_edges, unique_xedges, unique_yedges, mesh_res, max_res, mesh_data[0], 'x', check_max_resolution=True)
+        # y-direction
+        self.handle_otheredges(diagonal_edges, unique_xedges, unique_yedges, mesh_res, max_res, mesh_data[1], 'y', check_max_resolution=True)
 
-    def add_ports_to_hint(self, hint, edges, direction):
+    def handle_circular_segments(self, polygon, mesh_data):
+
+        circ_segments = self.found_circles
+
+        if circ_segments:
+            print(f"Gefundene Kreisabschnitte: {len(circ_segments)}")
+            for i, (x_seg, y_seg) in enumerate(circ_segments):
+                print(f"  Kreis #{i+1}:")
+                print("    X:", x_seg)
+                print("    Y:", y_seg)
+        else:
+            print("Kein kreisförmiger Abschnitt gefunden.")
+
+        # delete mesh lines that are inside the circle
+        if circ_segments:
+            for x_seg, y_seg in circ_segments:
+                # Remove x lines inside the circle
+                mesh_data[0] = [line for line in mesh_data[0] if not (min(x_seg) < line < max(x_seg))]
+                # Add x lines inside the circle
+                mesh_data[0].extend(SmoothMeshLines([min(x_seg), max(x_seg)], self.max_res))
+                # Remove y lines inside the circle
+                mesh_data[1] = [line for line in mesh_data[1] if not (min(y_seg) < line < max(y_seg))]
+                # Add y lines inside the circle
+                mesh_data[1].extend(SmoothMeshLines([min(y_seg), max(y_seg)], self.max_res))
+
+    def add_ports_to_mesh_data(self, mesh_data, edges, direction):
         x, y = [], []
         zedges = []
         xedges, yedges = [], []
-        otheredges = []
+        diagonal_edges = []
         for prim in self.primitives_mesh_setup:
             if hasattr(prim, 'priority'):
                 port_coords_x, port_coords_y, port_coords_z = self.transfer_port_to_polygon(prim.start, prim.stop)
@@ -534,7 +599,7 @@ class Automesher:
                 #     print('prim.meas_plane_shift:', prim, prim.measplane_shift)
                 x.extend(port_coords_x)
                 y.extend(port_coords_y)
-                self.collect_edges(port_coords_x, port_coords_y, prim, xedges, yedges, otheredges)
+                self.collect_edges(port_coords_x, port_coords_y, prim, xedges, yedges, diagonal_edges)
                 z = [(z, None, None, prim) for z in port_coords_z]
                 zedges.extend(z)
         if direction == 'x':
@@ -548,17 +613,17 @@ class Automesher:
                 edges.extend(zedges)
         for edge in edges:
             if hasattr(edge[3], 'priority'):
-                hint.append(edge[0])
-                for line in hint:
+                mesh_data.append(edge[0])
+                for line in mesh_data:
                     if abs(line - edge[0]) < self.min_cellsize/2:
                         if any([e[0] == line and hasattr(e[3], 'priority') for e in edges]):
                             continue
                         elif not any([e[0] == line and hasattr(e[3], 'priority') for e in edges]):
-                            if line in hint:
-                                hint.remove(line)
-        return hint
+                            if line in mesh_data:
+                                mesh_data.remove(line)
+        return mesh_data
         
-    def add_edges_to_mesh_hint(self, hint, edges, mesh_res, min_cellsize, direction):
+    def add_edges_to_mesh_mesh_data(self, mesh_data, edges, mesh_res, min_cellsize, direction):
 
         self.remove_close_edges(edges, min_cellsize, direction)
         for edge in edges:
@@ -567,11 +632,11 @@ class Automesher:
                     self.global_mesh_setup.get('dirs')
             if direction == 'x':
                 if 'x' in dirs:              
-                    hint.append(edge[0])
+                    mesh_data.append(edge[0])
             if direction == 'y':
                 if 'y' in dirs:
-                    hint.append(edge[0])
-        # hint.extend(edge[0] for edge in edges)
+                    mesh_data.append(edge[0])
+        # mesh_data.extend(edge[0] for edge in edges)
 
     def remove_close_edges(self, edges, min_cellsize, direction):
 
@@ -621,7 +686,7 @@ class Automesher:
                                
         return unique_edges
 
-    def mesh_small_gaps(self, unique_edges, mesh_res, max_res, num_lines, hint, direction):
+    def mesh_small_gaps(self, unique_edges, mesh_res, max_res, num_lines, mesh_data, direction):
         unique_edges.sort(key = lambda x: x[0])
         min_cellsize = self.global_mesh_setup.get('min_cellsize', None)
         use_num_lines = True if min_cellsize is None else False
@@ -629,10 +694,10 @@ class Automesher:
         if direction == 'z':
             for i in range(len(unique_edges) - 1):
                 if abs(np.diff([unique_edges[i][0], unique_edges[i + 1][0]])) <= mesh_res and abs(np.diff([unique_edges[i][0], unique_edges[i + 1][0]])) >= max_res:
-                    z_in_range = [z for z in hint[2] if unique_edges[i][0] <= z <= unique_edges[i + 1][0]]
+                    z_in_range = [z for z in mesh_data[2] if unique_edges[i][0] <= z <= unique_edges[i + 1][0]]
                     for z in z_in_range:
-                        hint[2] = list(hint[2])  
-                        hint[2].remove(z)
+                        mesh_data[2] = list(mesh_data[2])  
+                        mesh_data[2].remove(z)
                     # if use_num_lines:
                     #     new_max_res = np.diff(np.linspace(unique_edges[i][0], unique_edges[i + 1][0], num_lines))
                     #     new_max_res = np.max(new_max_res)
@@ -641,10 +706,10 @@ class Automesher:
                     #     new_max_res = max_res
                     zlines = SmoothMeshLines([unique_edges[i][0], unique_edges[i + 1][0]], self.max_res)
                     # if len(zlines) <= 4:
-                    #     hint[2] = list(hint[2]) 
-                    #     hint[2].extend(np.linspace(unique_edges[i][0], unique_edges[i + 1][0], 4))
+                    #     mesh_data[2] = list(mesh_data[2]) 
+                    #     mesh_data[2].extend(np.linspace(unique_edges[i][0], unique_edges[i + 1][0], 4))
                     # else:
-                    hint[2].extend(zlines)
+                    mesh_data[2].extend(zlines)
         else:
             for i in range(len(unique_edges) - 1):
                 if abs(np.diff([unique_edges[i][0], unique_edges[i + 1][0]])) <= mesh_res and abs(np.diff([unique_edges[i][0], unique_edges[i + 1][0]])) >= max_res and abs(np.diff([unique_edges[i][0], unique_edges[i + 1][0]])) >= 1.5:
@@ -655,9 +720,9 @@ class Automesher:
                         y1_next <= y1 <= y2_next or y1_next >= y1 >= y2_next or
                         y1_next <= y2 <= y2_next or y1_next >= y2 >= y2_next):
                             if direction == 'x':
-                                x_in_range = [x for x in hint[0] if unique_edges[i][0] <= x <= unique_edges[i + 1][0]]
+                                x_in_range = [x for x in mesh_data[0] if unique_edges[i][0] <= x <= unique_edges[i + 1][0]]
                                 for x in x_in_range:
-                                    hint[0].remove(x)
+                                    mesh_data[0].remove(x)
                                 if use_num_lines:
                                     new_max_res = np.diff(np.linspace(unique_edges[i][0], unique_edges[i + 1][0], num_lines))
                                     new_max_res = np.max(new_max_res)
@@ -666,13 +731,13 @@ class Automesher:
                                     new_max_res = max_res
                                 xlines = SmoothMeshLines([unique_edges[i][0], unique_edges[i + 1][0]], new_max_res)
                                 if len(xlines) <= 4:
-                                    hint[0].extend(np.linspace(unique_edges[i][0], unique_edges[i + 1][0], 4))
+                                    mesh_data[0].extend(np.linspace(unique_edges[i][0], unique_edges[i + 1][0], 4))
                                 else:
-                                    hint[0].extend(xlines)
+                                    mesh_data[0].extend(xlines)
                             elif direction == 'y':
-                                y_in_range = [y for y in hint[1] if unique_edges[i][0] <= y <= unique_edges[i + 1][0]]
+                                y_in_range = [y for y in mesh_data[1] if unique_edges[i][0] <= y <= unique_edges[i + 1][0]]
                                 for y in y_in_range:
-                                    hint[1].remove(y)
+                                    mesh_data[1].remove(y)
                                 if use_num_lines:
                                     new_max_res = np.diff(np.linspace(unique_edges[i][0], unique_edges[i + 1][0], num_lines))
                                     new_max_res = np.max(new_max_res)
@@ -681,20 +746,20 @@ class Automesher:
                                     new_max_res = max_res
                                 ylines = SmoothMeshLines([unique_edges[i][0], unique_edges[i + 1][0]], new_max_res)
                                 if len(ylines) <= 4:
-                                    hint[1].extend(np.linspace(unique_edges[i][0], unique_edges[i + 1][0], 4))
+                                    mesh_data[1].extend(np.linspace(unique_edges[i][0], unique_edges[i + 1][0], 4))
                                 else:
-                                    hint[1].extend(ylines)
+                                    mesh_data[1].extend(ylines)
         # if max_res_list:
         #     self.min_cellsize = min(max_res_list) - 0.25*min(max_res_list)
         #     print('self.min_cellsize:', self.min_cellsize)
         #     self.max_res = min(max_res_list)
 
-    def add_missing_mesh_lines(self, unique_edges, sorted_points, otheredges, mesh_res, hint, direction):
+    def add_missing_mesh_lines(self, unique_edges, sorted_points, diagonal_edges, mesh_res, mesh_data, direction):
         'Check if the first and last point are x or y edges, if not it adds the missing mesh lines between the point and the edge'
         # if unique_edges.size > 0:
         if unique_edges:
             if unique_edges[-1][0] < sorted_points[-1]:
-                for other_edge in otheredges:
+                for other_edge in diagonal_edges:
                     if direction == 'x':
                         start, end = other_edge[0], other_edge[1]
                     if direction == 'y':
@@ -704,9 +769,9 @@ class Automesher:
                             lines = np.linspace(unique_edges[-1][0], min(start, end), 5)[1:]
                         else:
                             lines = SmoothMeshLines([unique_edges[-1][0], min(start, end)], mesh_res)[1:]
-                        hint.extend(lines)
+                        mesh_data.extend(lines)
             if unique_edges[0][0] > sorted_points[0]:
-                for other_edge in otheredges:
+                for other_edge in diagonal_edges:
                     if direction == 'x':
                         start, end = other_edge[0], other_edge[1]
                     if direction == 'y':
@@ -716,27 +781,40 @@ class Automesher:
                             lines = np.linspace(unique_edges[0][0], max(start, end), 5)[1:]
                         else:
                             lines = SmoothMeshLines([max(start, end), unique_edges[0][0]], mesh_res)
-                        hint.extend(lines)         
+                        mesh_data.extend(lines)         
     
     def process_mesh_lines(self, grid):
 
         x, y, z = grid.GetLines(0), grid.GetLines(1), grid.GetLines(2)
 
-        x_hint = list(self.mesh_data.values())[0][0]
-        x_hint = x_hint[0]  
-        y_hint = list(self.mesh_data.values())[0][0]
-        y_hint = y_hint[1] 
+        x_mesh_data = list(self.mesh_data.values())[0][0]
+        x_mesh_data = x_mesh_data[0]  
+        y_mesh_data = list(self.mesh_data.values())[0][0]
+        y_mesh_data = y_mesh_data[1] 
 
         xmax, xmin, ymax, ymin = max(x), min(x), max(y), min(y)
 
-        if xmax in x_hint:
+        if xmax in x_mesh_data:
             x= np.append(x, xmax+self.wave_length)
-        if xmin in x_hint:
+        if xmin in x_mesh_data:
             x= np.append(x, xmin-self.wave_length)
-        if ymax in y_hint:
+        if ymax in y_mesh_data:
             y= np.append(y, ymax+self.wave_length)
-        if ymin in y_hint:
+        if ymin in y_mesh_data:
             y= np.append(y, ymin-self.wave_length)
+
+        polygon = list(self.primitives_mesh_setup.keys())
+        diagonal_edges = []
+        xedges, yedges = [], []
+        xx, yy= [], []
+        if isinstance(polygon, list):
+            for prim in polygon:
+                self.process_primitive(prim, xx, yy, xedges, yedges, diagonal_edges)
+        else:
+            self.process_primitive(polygon, xx, yy, xedges, yedges, diagonal_edges)
+
+        xedges.sort(key=lambda edge: edge[0])
+        yedges.sort(key=lambda edge: edge[0]) 
 
         # x, y, z = self.mesh_data.get('x', [x, None]), self.mesh_data.get('y', [y, None]), self.mesh_data.get('z', [z, None]) 
         # print('mesh_data:', [value[0][0] for value in list(self.mesh_data.values())])
@@ -754,9 +832,9 @@ class Automesher:
         #     z = [item for sublist in z for item in sublist if sublist is not None]
 
         zz_tuples = [(z, None) for z in z]
-        hint = [[], [], z]
-        # self.mesh_small_gaps(zz_tuples, self.mesh_res, self.max_res, self.num_lines, hint, 'z')
-        z = np.append(hint[2], z)
+        mesh_data = [[], [], z]
+        # self.mesh_small_gaps(zz_tuples, self.mesh_res, self.max_res, self.num_lines, mesh_data, 'z')
+        z = np.append(mesh_data[2], z)
         z = np.unique(z)
         lines = [[SmoothMeshLines(x, self.max_cellsize, 1.3)], [SmoothMeshLines(y, self.max_cellsize/2, 1.3)], [SmoothMeshLines(z, self.max_cellsize, 1.3)]]
         for i in range(1, len(np.diff(lines[2][0])) - 1):
@@ -764,13 +842,25 @@ class Automesher:
             if i + 1 < len(lines[2][0]) and np.round(np.diff(lines[2][0])[i] / np.diff(lines[2][0])[i + 1], 1) > 2 and np.diff(lines[2][0])[i] > self.min_cellsize:
                 lines[2][0] = list(lines[2][0])  # Convert to list
                 lines[2][0].extend(SmoothMeshLines([lines[2][0][i], lines[2][0][i + 1]], self.mesh_res/2, 1.3))
+                # Check lines between x edges
+        for i in range(len(xedges) - 1):
+            if abs(xedges[i][0] - xedges[i + 1][0]) > self.mesh_res:
+                lines_in_range = [line for line in lines[0][0] if xedges[i][0] < line < xedges[i + 1][0]]
+                if not lines_in_range:
+                    lines[0][0] = np.append(lines[0][0], np.linspace(xedges[i][0], xedges[i + 1][0], self.num_lines))
+        # Check lines between y edges
+        for i in range(len(yedges) - 1):
+            if abs(yedges[i][0] - yedges[i + 1][0]) > self.mesh_res:
+                lines_in_range = [line for line in lines[1][0] if yedges[i][0] < line < yedges[i + 1][0]]
+                if not lines_in_range:
+                    lines[1][0] = np.append(lines[1][0], np.linspace(yedges[i][0], yedges[i + 1][0], self.num_lines))
 
         z = [(z, None) for z in z]
         x = [(x, None ) for x in lines[0][0]]
         y = [(y, None) for y in y]
-        # lines[0][0] = self.process_hint(lines[0][0], self.min_cellsize, x)
-        # lines[1][0] = self.process_hint(lines[1][0], self.min_cellsize, y)
-        # lines[2][0] = self.process_hint(lines[2][0], self.min_cellsize, z)
+        # lines[0][0] = self.process_mesh_data(lines[0][0], self.min_cellsize, x)
+        # lines[1][0] = self.process_mesh_data(lines[1][0], self.min_cellsize, y)
+        # lines[2][0] = self.process_mesh_data(lines[2][0], self.min_cellsize, z)
 
         lines[2][0] = np.unique(lines[2][0])
         return lines 
@@ -789,17 +879,17 @@ class Automesher:
         port_coords_z = [start[2], stop[2]]
         return port_coords_x, port_coords_y, port_coords_z
     
-    def process_primitive(self, prim, x, y, xedges, yedges, otheredges):
+    def process_primitive(self, prim, x, y, xedges, yedges, diagonal_edges):
         if not hasattr(prim, 'GetType'):
             port_coords_x, port_coords_y, port_coords_z = self.transfer_port_to_polygon(prim.start, prim.stop)
             x.extend(port_coords_x)
             y.extend(port_coords_y)
-            self.collect_edges(port_coords_x, port_coords_y, prim, xedges, yedges, otheredges)
+            self.collect_edges(port_coords_x, port_coords_y, prim, xedges, yedges, diagonal_edges)
         elif prim.GetType() == CSPrimitives.BOX:
             box_coords_x, box_coords_y, box_coords_z = self.tranfer_box_to_polygon(prim)
             x.extend(box_coords_x)
             y.extend(box_coords_y)
-            self.collect_edges(box_coords_x, box_coords_y, prim, xedges, yedges, otheredges)
+            self.collect_edges(box_coords_x, box_coords_y, prim, xedges, yedges, diagonal_edges)
         else:
             xx, yy = prim.GetCoords()[0], prim.GetCoords()[1]
             x.extend(xx)
@@ -807,12 +897,12 @@ class Automesher:
             if xx[-1] != xx[0] or yy[-1] != yy[0]:
                 xx = np.append(xx, xx[0])
                 yy = np.append(yy, yy[0])
-            self.collect_edges(xx, yy, prim, xedges, yedges, otheredges)
+            self.collect_edges(xx, yy, prim, xedges, yedges, diagonal_edges)
 
-    def collect_edges(self, x_coords, y_coords, prim, xedges, yedges, otheredges):
+    def collect_edges(self, x_coords, y_coords, prim, xedges, yedges, diagonal_edges):
         for i in range(len(x_coords) - 1):
             if x_coords[i] != x_coords[i + 1] and y_coords[i] != y_coords[i + 1]:
-                otheredges.append([x_coords[i], x_coords[i + 1], y_coords[i], y_coords[i + 1], prim])
+                diagonal_edges.append([x_coords[i], x_coords[i + 1], y_coords[i], y_coords[i + 1], prim])
             if x_coords[i] == x_coords[i + 1]:
                 xedges.append([x_coords[i], y_coords[i], y_coords[i + 1], prim])
             if y_coords[i] == y_coords[i + 1]:
@@ -828,22 +918,22 @@ class Automesher:
         z.extend(box_coords_z)
         return z
 
-    def process_z_coordinates(self, z, hint):
+    def process_z_coordinates(self, z, mesh_data):
         for z_val, prim in z:
             dirs = self.primitives_mesh_setup.get(prim, {}).get('dirs') or \
             self.properties_mesh_setup.get(prim.GetProperty(), {}).get('dirs') or \
             self.global_mesh_setup.get('dirs')
             if dirs is not None and 'z' in dirs:
-                hint[2].append(z_val)            
+                mesh_data[2].append(z_val)            
 
-    def process_single_polygon(self, polygon, x, y, xedges, yedges, otheredges):
+    def process_single_polygon(self, polygon, x, y, xedges, yedges, diagonal_edges):
         xx, yy = polygon.GetCoords()[0], polygon.GetCoords()[1]
 
         x = np.append(x, xx)
         y = np.append(y, yy)
         for i in range(len(xx) - 1):
             if xx[i] != xx[i + 1] and yy[i] != yy[i + 1]:
-                otheredges.append([xx[i], xx[i + 1], yy[i], yy[i + 1], polygon])
+                diagonal_edges.append([xx[i], xx[i + 1], yy[i], yy[i + 1], polygon])
             if xx[i] == xx[i + 1]:
                 xedges.append([xx[i], yy[i], yy[i + 1], polygon])
             if yy[i] == yy[i + 1]:
@@ -905,44 +995,45 @@ class Automesher:
         max_res = min_cellsize + 0.25 * min_cellsize
         return mesh_res, min_cellsize, max_res, max_cellsize, num_lines               
 
-    def process_hint(self, hint, min_cellsize, unique_edges):
-        hint = sorted(hint)
+    def process_mesh_data(self, mesh_data, min_cellsize, unique_edges):
+        mesh_data = sorted(mesh_data)
         while True:  
-            new_hint = []
+            new_mesh_data = []
             skip_next = False
             changed = False 
 
-            for i in range(len(hint) - 1):
+            for i in range(len(mesh_data) - 1):
                 if skip_next:
                     skip_next = False
                     continue
 
-                if abs(hint[i+1] - hint[i]) < min_cellsize / 2:
+                if abs(mesh_data[i+1] - mesh_data[i]) < min_cellsize / 2:
                     changed = True  
-                    if any(hint[i] == edge[0] for edge in unique_edges) and not any(hint[i+1] == edge[0] for edge in unique_edges):
-                        new_hint.append(hint[i])
+                    if any(mesh_data[i] == edge[0] for edge in unique_edges) and not any(mesh_data[i+1] == edge[0] for edge in unique_edges):
+                        new_mesh_data.append(mesh_data[i])
                         skip_next = True
-                    elif any(hint[i+1] == edge[0] for edge in unique_edges) and not any(hint[i] == edge[0] for edge in unique_edges):
-                        new_hint.append(hint[i+1])
+                    elif any(mesh_data[i+1] == edge[0] for edge in unique_edges) and not any(mesh_data[i] == edge[0] for edge in unique_edges):
+                        new_mesh_data.append(mesh_data[i+1])
                         skip_next = True
-                    elif any(hint[i] == edge[0] for edge in unique_edges) and any(hint[i+1] == edge[0] for edge in unique_edges):
-                        new_hint.append((hint[i] + hint[i+1]) / 2)
-                        skip_next = True
+                    elif any(mesh_data[i] == edge[0] for edge in unique_edges) and any(mesh_data[i+1] == edge[0] for edge in unique_edges):
+                        # new_mesh_data.append((mesh_data[i] + mesh_data[i+1]) / 2)
+                        skip_next = False
+                        continue
                     else:
-                        new_hint.append((hint[i] + hint[i+1]) / 2)
+                        new_mesh_data.append((mesh_data[i] + mesh_data[i+1]) / 2)
                         skip_next = True
                 else:
-                    new_hint.append(hint[i])
+                    new_mesh_data.append(mesh_data[i])
 
-            if not skip_next and hint:
-                new_hint.append(hint[-1])
+            if not skip_next and mesh_data:
+                new_mesh_data.append(mesh_data[-1])
 
             if not changed:
                 break  
 
-            hint = new_hint  
+            mesh_data = new_mesh_data  
 
-        return hint
+        return mesh_data
 
     def get_unique_edges(self, edges):
 
@@ -952,50 +1043,50 @@ class Automesher:
         unique_edges.sort(key=lambda x: x[0])
         return unique_edges      
           
-    def metal_edge(self, edges, polygon, mesh_res, hint, dirs, metal_edge_res, direction):
+    def metal_edge(self, edges, polygon, mesh_res, mesh_data, dirs, metal_edge_res, direction):
         'not ready yet'
 
 
         # if metal_edge_res is not None:
         #     if unique_xedges[0] <= sorted_x[0]:
-        #         hint_in_range =  [hint for hint in hint[0] if unique_xedges[0]-mer[1] <= hint <= unique_xedges[0]-mer[0]]
-        #         if not hint_in_range:
-        #             hint[0].append(unique_xedges[0]-mer[1])
-        #             hint[0].append(unique_xedges[0]-mer[0])
+        #         mesh_data_in_range =  [mesh_data for mesh_data in mesh_data[0] if unique_xedges[0]-mer[1] <= mesh_data <= unique_xedges[0]-mer[0]]
+        #         if not mesh_data_in_range:
+        #             mesh_data[0].append(unique_xedges[0]-mer[1])
+        #             mesh_data[0].append(unique_xedges[0]-mer[0])
         #         else:
-        #             hint[0] = [h for h in hint[0] if h not in hint_in_range]
-        #             hint[0].append(unique_xedges[0]-mer[1])
-        #             hint[0].append(unique_xedges[0]-mer[0])
+        #             mesh_data[0] = [h for h in mesh_data[0] if h not in mesh_data_in_range]
+        #             mesh_data[0].append(unique_xedges[0]-mer[1])
+        #             mesh_data[0].append(unique_xedges[0]-mer[0])
         #     if unique_xedges[-1] >= sorted_x[-1]:
-        #         hint_in_range =  [hint for hint in hint[0] if unique_xedges[-1]+mer[0] <= hint <= unique_xedges[-1]+mer[1]]
-        #         if not hint_in_range:
-        #             hint[0].append(unique_xedges[-1]+mer[0])
-        #             hint[0].append(unique_xedges[-1]+mer[1])
+        #         mesh_data_in_range =  [mesh_data for mesh_data in mesh_data[0] if unique_xedges[-1]+mer[0] <= mesh_data <= unique_xedges[-1]+mer[1]]
+        #         if not mesh_data_in_range:
+        #             mesh_data[0].append(unique_xedges[-1]+mer[0])
+        #             mesh_data[0].append(unique_xedges[-1]+mer[1])
         #         else:
-        #             hint[0] = [h for h in hint[0] if h not in hint_in_range]
-        #             hint[0].append(unique_xedges[-1]+mer[0])
-        #             hint[0].append(unique_xedges[-1]+mer[1])
+        #             mesh_data[0] = [h for h in mesh_data[0] if h not in mesh_data_in_range]
+        #             mesh_data[0].append(unique_xedges[-1]+mer[0])
+        #             mesh_data[0].append(unique_xedges[-1]+mer[1])
         #     if unique_yedges[0] <= sorted_y[0]:
-        #         hint_in_range =  [hint for hint in hint[1] if unique_yedges[0]-mer[1] <= hint <= unique_yedges[0]-mer[0]]
-        #         if not hint_in_range:
-        #             hint[1].append(unique_yedges[0]-mer[1])
-        #             hint[1].append(unique_yedges[0]-mer[0])
+        #         mesh_data_in_range =  [mesh_data for mesh_data in mesh_data[1] if unique_yedges[0]-mer[1] <= mesh_data <= unique_yedges[0]-mer[0]]
+        #         if not mesh_data_in_range:
+        #             mesh_data[1].append(unique_yedges[0]-mer[1])
+        #             mesh_data[1].append(unique_yedges[0]-mer[0])
         #         else:
-        #             hint[1] = [h for h in hint[1] if h not in hint_in_range]
-        #             hint[1].append(unique_yedges[0]-mer[1])
-        #             hint[1].append(unique_yedges[0]-mer[0])
+        #             mesh_data[1] = [h for h in mesh_data[1] if h not in mesh_data_in_range]
+        #             mesh_data[1].append(unique_yedges[0]-mer[1])
+        #             mesh_data[1].append(unique_yedges[0]-mer[0])
         #     if unique_yedges[-1] >= sorted_y[-1]:
-        #         hint_in_range =  [hint for hint in hint[1] if unique_yedges[-1]+mer[0] <= hint <= unique_yedges[-1]+mer[1]]
-        #         if not hint_in_range:
-        #             hint[1].append(unique_yedges[-1]+mer[0])
-        #             hint[1].append(unique_yedges[-1]+mer[1])
+        #         mesh_data_in_range =  [mesh_data for mesh_data in mesh_data[1] if unique_yedges[-1]+mer[0] <= mesh_data <= unique_yedges[-1]+mer[1]]
+        #         if not mesh_data_in_range:
+        #             mesh_data[1].append(unique_yedges[-1]+mer[0])
+        #             mesh_data[1].append(unique_yedges[-1]+mer[1])
         #         else:
-        #             hint[1] = [h for h in hint[1] if h not in hint_in_range]
-        #             hint[1].append(unique_yedges[-1]+mer[0])
-        #             hint[1].append(unique_yedges[-1]+mer[1])
+        #             mesh_data[1] = [h for h in mesh_data[1] if h not in mesh_data_in_range]
+        #             mesh_data[1].append(unique_yedges[-1]+mer[0])
+        #             mesh_data[1].append(unique_yedges[-1]+mer[1])
         
         if isinstance(polygon, list):
-            coords = [prim.GetCoords() for prim in polygon]
+            coords = [prim.GetCoords() for prim in polygon if hasattr(prim, 'GetCoords')]
             x = np.concatenate([coord[0] for coord in coords])
             y = np.concatenate([coord[1] for coord in coords])
             coords = (x, y)
@@ -1019,25 +1110,25 @@ class Automesher:
                         condition2 = self.xline_in_polygon(coords, edges[i][1], edges[i][2], edges[i][0]-min_distance_y/2) and self.xline_in_polygon(coords, edges[i][1], edges[i][2], edges[i][0]+min_distance_y/2)
                         if i > 0 and abs(edges[i][0] - edges[i + 1][0]) > mesh_res and abs(edges[i][0] - edges[i - 1][0]) > mesh_res:
                             if condition1:
-                                hint_in_range =  [hint for hint in hint if edges[i][0]-mer[1] <= hint <= edges[i][0]-mer[0]]
-                                if not hint_in_range:
-                                    hint.append(edges[i][0]-mer[1])
-                                    hint.append(edges[i][0]-mer[0])
+                                mesh_data_in_range =  [mesh_data for mesh_data in mesh_data if edges[i][0]-mer[1] <= mesh_data <= edges[i][0]-mer[0]]
+                                if not mesh_data_in_range:
+                                    mesh_data.append(edges[i][0]-mer[1])
+                                    mesh_data.append(edges[i][0]-mer[0])
                                 else:
-                                    hint = [h for h in hint if h not in hint_in_range]
-                                    hint.append(edges[i][0]-mer[1])
-                                    hint.append(edges[i][0]-mer[0])
+                                    mesh_data = [h for h in mesh_data if h not in mesh_data_in_range]
+                                    mesh_data.append(edges[i][0]-mer[1])
+                                    mesh_data.append(edges[i][0]-mer[0])
                             elif condition2:
                                 continue
                             else:
-                                hint_in_range =  [hint for hint in hint if edges[i][0]+mer[0] <= hint <= edges[i][0]+mer[1]]
-                                if not hint_in_range:
-                                    hint.append(edges[i][0]+mer[0])
-                                    hint.append(edges[i][0]+mer[1])
+                                mesh_data_in_range =  [mesh_data for mesh_data in mesh_data if edges[i][0]+mer[0] <= mesh_data <= edges[i][0]+mer[1]]
+                                if not mesh_data_in_range:
+                                    mesh_data.append(edges[i][0]+mer[0])
+                                    mesh_data.append(edges[i][0]+mer[1])
                                 else:
-                                    hint = [h for h in hint if h not in hint_in_range]
-                                    hint.append(edges[i][0]+mer[0])
-                                    hint.append(edges[i][0]+mer[1])
+                                    mesh_data = [h for h in mesh_data if h not in mesh_data_in_range]
+                                    mesh_data.append(edges[i][0]+mer[0])
+                                    mesh_data.append(edges[i][0]+mer[1])
 
     def distance_between_segments(self, p1, p2, q1, q2):
         p = np.linspace(p1, p2, 10)
@@ -1051,7 +1142,7 @@ class Automesher:
             return np.linalg.norm(p - closest_point)
         distances = []
         for p_point in p:
-            distances.append((point_to_line_distance(p_point, q1, q2), p_point, q1, q2))
+            distances.append((point_to_line_distance(p_point, q1, q2), p_point, p1, p2, q1, q2))
         return distances
     def add_graded_mesh_lines(self, start, end, growth):
 
@@ -1076,7 +1167,7 @@ class Automesher:
 
         return lines
 
-    def add_graded_mesh_lines_at_material_transitions(self, edges, hint, mesh_res):
+    def add_graded_mesh_lines_at_material_transitions(self, edges, mesh_data, mesh_res):
 
         for i in range(len(edges) - 1):
             if abs(np.diff([edges[i][0], edges[i + 1][0]])) == 0 and edges[i][0] > np.min(edges[0][0]) and edges[i+1][0] < np.max(edges[-1][0]):
@@ -1085,15 +1176,15 @@ class Automesher:
                         if hasattr(edges[i][3].GetProperty(),'GetMaterialProperty') and not hasattr(edges[i + 1][3].GetProperty(), 'GetMaterialProperty') or \
                             hasattr(edges[i + 1][3].GetProperty(),'GetMaterialProperty') and not hasattr(edges[i][3].GetProperty(), 'GetMaterialProperty'):
                                 lines = self.add_graded_mesh_lines(edges[i][0], edges[i][0]-mesh_res,1.3)
-                                hint.extend(lines)
+                                mesh_data.extend(lines)
                                 lines = self.add_graded_mesh_lines(edges[i][0], edges[i][0]+mesh_res,1.3)
-                                hint.extend(lines)
+                                mesh_data.extend(lines)
 
                         if hasattr(edges[i][3].GetProperty(),'GetMaterialProperty') and hasattr(edges[i + 1][3].GetProperty(), 'GetMaterialProperty'):
                             if edges[i][3].GetProperty().GetMaterialProperty('epsilon') != edges[i + 1][3].GetProperty().GetMaterialProperty('epsilon'):
                                 lines = self.add_graded_mesh_lines(edges[i][0], edges[i][0]-mesh_res,1.1)
                                 lines = self.add_graded_mesh_lines(edges[i][0], edges[i][0]+mesh_res,1.1)
-                                hint.extend(lines)
+                                mesh_data.extend(lines)
 
     def is_circle_in_polygon(self, polygon, min_points=8, tolerance=0.01, return_segment=False):
         coords = polygon.GetCoords()
@@ -1177,57 +1268,54 @@ class Automesher:
 
         return True
     
-# def detect_all_circles_in_polygon(polygon, min_points=8, tolerance=0.01):
-#     """
-#     Findet alle kreisähnlichen Abschnitte im Polygon.
+    def detect_all_circles_in_polygon(self, polygon, min_points=20, tolerance=0.01):
+        """
+        Findet alle kreisähnlichen Abschnitte im Polygon.
 
-#     Args:
-#         polygon: Das Polygon-Objekt mit GetCoords()
-#         min_points: Mindestanzahl von Punkten, um als Kreis zu gelten
-#         tolerance: Relative Toleranz für den Radiusvergleich
+        Args:
+            polygon: Das Polygon-Objekt mit GetCoords()
+            min_points: Mindestanzahl von Punkten, um als Kreis zu gelten
+            tolerance: Relative Toleranz für den Radiusvergleich
 
-#     Returns:
-#         Liste von Tupeln: [(sub_x1, sub_y1), (sub_x2, sub_y2), ...] für jeden gefundenen Kreisabschnitt
-#     """
-#     coords = polygon.GetCoords()
-#     x_coords = np.array(coords[0])
-#     y_coords = np.array(coords[1])
-#     N = len(x_coords)
+        Returns:
+            Liste von Tupeln: [(sub_x1, sub_y1), (sub_x2, sub_y2), ...] für jeden gefundenen Kreisabschnitt
+        """
+        if self.global_mesh_setup.get('use_circle_detection', False) is False:
+            return []
+        if isinstance(polygon, list):
+            coords = [prim.GetCoords() for prim in polygon if hasattr(prim, 'GetCoords')]
+            x_coords = np.concatenate([coord[0] for coord in coords])
+            y_coords = np.concatenate([coord[1] for coord in coords])
+        else:                
+            coords = polygon.GetCoords()
+            x_coords = np.array(coords[0])
+            y_coords = np.array(coords[1])
+        N = len(x_coords)
 
-#     found_segments = []
-#     used_indices = set()
+        found_segments = []
+        used_indices = set()
 
-#     for start in range(N - min_points + 1):
-#         for length in range(min_points, N - start + 1):
-#             indices = tuple(range(start, start + length))
+        for start in range(N - min_points + 1):
+            for length in range(min_points, N - start + 1):
+                indices = tuple(range(start, start + length))
 
-#             # Falls diese Punkte schon Teil eines gefundenen Kreises sind, überspringen
-#             if any(i in used_indices for i in indices):
-#                 continue
+                # Falls diese Punkte schon Teil eines gefundenen Kreises sind, überspringen
+                if any(i in used_indices for i in indices):
+                    continue
 
-#             sub_x = x_coords[list(indices)]
-#             sub_y = y_coords[list(indices)]
+                sub_x = x_coords[list(indices)]
+                sub_y = y_coords[list(indices)]
 
-#             # Mittelpunkt-Näherung
-#             x0, y0 = np.mean(sub_x), np.mean(sub_y)
-#             radii = np.sqrt((sub_x - x0)**2 + (sub_y - y0)**2)
-#             mean_radius = np.mean(radii)
-#             deviation = np.abs(radii - mean_radius) / mean_radius
+                # Mittelpunkt-Näherung
+                x0, y0 = np.mean(sub_x), np.mean(sub_y)
+                radii = np.sqrt((sub_x - x0)**2 + (sub_y - y0)**2)
+                mean_radius = np.mean(radii)
+                deviation = np.abs(radii - mean_radius) / mean_radius
 
-#             if np.all(deviation < tolerance):
-#                 found_segments.append((sub_x, sub_y))
-#                 used_indices.update(indices)
-#                 break  # Nicht überlappend: nächster Startpunkt
+                if np.all(deviation < tolerance):
+                    found_segments.append((sub_x, sub_y))
+                    used_indices.update(indices)
+                    break  # Nicht überlappend: nächster Startpunkt
+                
+        return found_segments
 
-#     return found_segments
-# segments = detect_all_circles_in_polygon(polygon)
-
-
-# if segments:
-#     print(f"Gefundene Kreisabschnitte: {len(segments)}")
-#     for i, (x_seg, y_seg) in enumerate(segments):
-#         print(f"  Kreis #{i+1}:")
-#         print("    X:", x_seg)
-#         print("    Y:", y_seg)
-# else:
-#     print("Kein kreisförmiger Abschnitt gefunden.")

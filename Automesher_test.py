@@ -79,7 +79,7 @@ mesh_res = C0/(f0+fc)/1e-3/20
 
 global_mesh_setup = {
     'dirs': 'xyz',
-    'mesh_resolution': 'low',
+    'mesh_resolution': 'medium',
     'drawing_unit': 1e-3,
     # 'min_cellsize': 3,
     'f0' : f0,
