@@ -41,25 +41,31 @@ resolution = resolution_0/np.sqrt(substrate_epr)
 ### Automehser Setup
 global_mesh_setup = {
     'dirs': 'xyz',
-    # 'refined_cellsize': 5,
+    # 'refined_cellsize': 1,
     # 'min_cellsize': 1,
     'drawing_unit': unit,
     'start_frequency': 0.0,
     'stop_frequency': f_max,
-    'mesh_resolution': 'very fine',
-    # 'max_cellsize': max_cellsize,
+    # 'mesh_resolution': 'very_high',
+    'max_cellsize': resolution,
+    'metal_edge_res': None
 }
 primitives_mesh_setup = {}
 properties_mesh_setup = {}
 AM = Automesher()
 
-mesh_hint_common = {
-    'metal_edge_res': None, 'dirs': 'xyz'
-}
+mesh_hint_common = {}
+
+## Add bounding sim_box
+sim_box = CSX.AddMaterial('sim_box', epsilon=1)
+start = [-MSL_length, -15*MSL_width,             0]
+stop  = [+MSL_length, +15*MSL_width+stub_length, 3000]
+obj = sim_box.AddBox(start, stop, priority=0)
+primitives_mesh_setup[obj] = mesh_hint_common
 
 ## Add the substrate
 substrate = CSX.AddMaterial('RO4350B', epsilon=substrate_epr)
-start = [-MSL_length, -15*MSL_width, 0]
+start = [-MSL_length, -15*MSL_width,             0]
 stop  = [+MSL_length, +15*MSL_width+stub_length, substrate_thickness]
 obj = substrate.AddBox(start, stop, priority=100)
 primitives_mesh_setup[obj] = mesh_hint_common
@@ -78,18 +84,23 @@ obj = pec.AddBox(start, stop, priority=200)
 primitives_mesh_setup[obj] = mesh_hint_common
 
 ## Ports
-port_start = [ 10*resolution, -MSL_width/2, substrate_thickness]
-port_stop  = [ 10*resolution,  MSL_width/2, 0.0]
+port_start = [-MSL_length+10*resolution, -MSL_width/2, substrate_thickness]
+port_stop  = [-MSL_length+10*resolution,  MSL_width/2, 0.0]
 port[0] = FDTD.AddLumpedPort(1, MSL_Zc, port_start, port_stop, 'z', 1.0, priority=900)
 primitives_mesh_setup[port[0]] = mesh_hint_common
 
-port_start = [-10*resolution, -MSL_width/2, substrate_thickness]
-port_stop  = [-10*resolution,  MSL_width/2, 0.0]
+port_start = [ MSL_length-10*resolution, -MSL_width/2, substrate_thickness]
+port_stop  = [ MSL_length-10*resolution,  MSL_width/2, 0.0]
 port[1] = FDTD.AddLumpedPort(2, MSL_Zc, port_start, port_stop, 'z', 0.0, priority=900)
 primitives_mesh_setup[port[1]] = mesh_hint_common
 
 ### Create auto mesh
 AM.GenMesh(CSX, global_mesh_setup, primitives_mesh_setup, properties_mesh_setup)
+
+mesh = CSX.GetGrid()
+mesh.AddLine('z', np.linspace(0,substrate_thickness,5))
+mesh.AddLine('z', 3000)
+mesh.SmoothMeshLines('z', resolution)
 
 ### Field Dump
 Et = CSX.AddDump('Et', file_type=0, sub_sampling=[2,2,2])
@@ -106,7 +117,7 @@ if 1:  # debugging only
     from CSXCAD import AppCSXCAD_BIN
     os.system(AppCSXCAD_BIN + ' "{}"'.format(CSX_file))
 
-quit()
+
 if not post_proc_only:
     FDTD.Run(Sim_Path, cleanup=True)
 
