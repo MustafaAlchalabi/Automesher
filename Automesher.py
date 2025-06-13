@@ -59,13 +59,13 @@ class Automesher:
 
     def collect_mesh_data(self, primitive, **kw):
         hint = None
-        if primitive.GetType() == CSPrimitives.POINT:
+        if primitive.GetType() == CSPrimitives.PrimitiveType.POINT:
             hint = self.mesh_hint_from_point(primitive, **kw)
-        elif primitive.GetType() == CSPrimitives.BOX:
+        elif primitive.GetType() == CSPrimitives.PrimitiveType.BOX:
             hint = self.mesh_hint_from_box(primitive, **kw)
-        elif primitive.GetType() == CSPrimitives.POLYGON:
+        elif primitive.GetType() == CSPrimitives.PrimitiveType.POLYGON:
             (hint,dirs,metal_edge_res) = self.mesh_hint_from_primitives(primitive, **kw)
-        elif primitive.GetType() == CSPrimitives.LINPOLY:
+        elif primitive.GetType() == CSPrimitives.PrimitiveType.LINPOLY:
             (hint,dirs,metal_edge_res) = self.mesh_hint_from_primitives(primitive, **kw)
         
         if hint is not None:
@@ -700,7 +700,7 @@ class Automesher:
             x.extend(port_coords_x)
             y.extend(port_coords_y)
             self.collect_edges(port_coords_x, port_coords_y, prim, xedges, yedges, otheredges)
-        elif prim.GetType() == CSPrimitives.BOX:
+        elif prim.GetType() == CSPrimitives.PrimitiveType.BOX:
             box_coords_x, box_coords_y, box_coords_z = self.tranfer_box_to_polygon(prim)
             x.extend(box_coords_x)
             y.extend(box_coords_y)
@@ -724,10 +724,10 @@ class Automesher:
                 yedges.append([y_coords[i], x_coords[i], x_coords[i + 1], prim])
 
     def collect_z_coordinates(self, polygon):
-        z = [(prim.GetElevation(), prim) for prim in polygon if hasattr(prim, 'GetType') and prim.GetType() != CSPrimitives.BOX]
-        z.extend((prim.GetElevation() + prim.GetLength(), prim) for prim in polygon if hasattr(prim, 'GetType') and prim.GetType() == CSPrimitives.LINPOLY)
-        box_coords_z = [(self.tranfer_box_to_polygon(prim)[2][0], prim) for prim in polygon if hasattr(prim, 'GetType') and prim.GetType() == CSPrimitives.BOX]
-        box_coords_z.extend((self.tranfer_box_to_polygon(prim)[2][1], prim) for prim in polygon if hasattr(prim, 'GetType') and prim.GetType() == CSPrimitives.BOX)
+        z = [(prim.GetElevation(), prim) for prim in polygon if hasattr(prim, 'GetType') and prim.GetType() != CSPrimitives.PrimitiveType.BOX]
+        z.extend((prim.GetElevation() + prim.GetLength(), prim) for prim in polygon if hasattr(prim, 'GetType') and prim.GetType() == CSPrimitives.PrimitiveType.LINPOLY)
+        box_coords_z = [(self.tranfer_box_to_polygon(prim)[2][0], prim) for prim in polygon if hasattr(prim, 'GetType') and prim.GetType() == CSPrimitives.PrimitiveType.BOX]
+        box_coords_z.extend((self.tranfer_box_to_polygon(prim)[2][1], prim) for prim in polygon if hasattr(prim, 'GetType') and prim.GetType() == CSPrimitives.PrimitiveType.BOX)
         z = list(set(z))
         z.sort(key=lambda x: x[0])
         z.extend(box_coords_z)
