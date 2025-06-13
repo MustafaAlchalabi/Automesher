@@ -1,12 +1,65 @@
 ### Import Libraries
 import os
 import numpy as np
-from CSXCAD  import ContinuousStructure
+import CSXCAD
 from openEMS import openEMS
 import openEMS.physical_constants as PC
 import matplotlib.pyplot as plt
 
 from Automesher import Automesher
+
+class AutoMeshFDTDWrapper:
+    def __init__(self, FDTD, AutoMesh):
+        self.FDTD = FDTD
+        self.AutoMesh = AutoMesh
+
+    def __getattr__(self, name):
+        if name == "SetCSX":
+            def wrapper(CSX, *args, **kwargs):
+                print("Wrapped:", name)
+                out = self.FDTD.SetCSX(CSX.CSX, *args, **kwargs)
+                return out
+            return wrapper
+        elif name == "AddLumpedPort":
+            def wrapper(*args, **kwargs):
+                print("Wrapped:", name)
+                out = getattr(self.FDTD, name)(*args, **kwargs)
+                self.AutoMesh.primitives_mesh_setup[out] = self.AutoMesh.mesh_hint_common
+                return out
+            return wrapper
+        else:
+            return getattr(self.FDTD, name) 
+
+class AutoMeshPropertyWrapper:
+    def __init__(self, Property, AutoMesh):
+        self.Property = Property
+        self.AutoMesh = AutoMesh
+
+    def __getattr__(self, name):
+        if name == "AddBox":
+            def wrapper(*args, **kwargs):
+                print("Wrapped:", name)
+                out = getattr(self.Property, name)(*args, **kwargs)
+                self.AutoMesh.primitives_mesh_setup[out] = self.AutoMesh.mesh_hint_common
+                return out
+            return wrapper
+        else:
+            return getattr(self.Property, name)
+
+class AutoMeshCSXWrapper:
+    def __init__(self, CSX, AutoMesh):
+        self.CSX = CSX
+        self.AutoMesh = AutoMesh
+
+    def __getattr__(self, name):
+        if name in ["AddMaterial", "AddMetal"]:
+            def wrapper(*args, **kwargs):
+                print("Wrapped:", name)
+                out = getattr(self.CSX, name)(*args, **kwargs)
+                return AutoMeshPropertyWrapper(out, self.AutoMesh)
+            return wrapper
+        else:
+            return getattr(self.CSX, name)
 
 ### Setup the simulation
 Sim_Path = os.path.abspath( os.path.join('simData', 'MSL_NotchFilter_autoMesher_decorators') )
@@ -24,22 +77,14 @@ MSL_Zc = 44.51
 
 R0 = 50.0
 
-### Setup FDTD parameters & excitation function
-FDTD = openEMS()
-FDTD.SetGaussExcite( f_max/2, f_max/2 )
-FDTD.SetBoundaryCond( ['PML_8', 'PML_8', 'MUR', 'MUR', 'PEC', 'MUR'] )
-
-### Setup Geometry & Mesh
-CSX = ContinuousStructure()
-FDTD.SetCSX(CSX)
-mesh = CSX.GetGrid()
-mesh.SetDeltaUnit(unit)
-
+### Grid and AutoMesher Setup
 resolution_0 = PC.C0/f_max/50 /unit
 resolution = resolution_0/np.sqrt(substrate_epr)
 
-### Automehser Setup
-global_mesh_setup = {
+AutoMesh = Automesher()
+AutoMesh.primitives_mesh_setup = {}
+AutoMesh.properties_mesh_setup = {}
+AutoMesh.global_mesh_setup = {
     'dirs': 'xyz',
     # 'refined_cellsize': 1,
     # 'min_cellsize': 1,
@@ -50,25 +95,32 @@ global_mesh_setup = {
     'max_cellsize': resolution,
     'metal_edge_res': None
 }
-primitives_mesh_setup = {}
-properties_mesh_setup = {}
-AM = Automesher()
+AutoMesh.mesh_hint_common = {}
 
-mesh_hint_common = {}
+### Setup FDTD parameters & excitation function
+FDTD = openEMS()
+FDTD = AutoMeshFDTDWrapper(FDTD, AutoMesh)
+FDTD.SetGaussExcite( f_max/2, f_max/2 )
+FDTD.SetBoundaryCond( ['PML_8', 'PML_8', 'MUR', 'MUR', 'PEC', 'MUR'] )
+
+### Setup Geometry & Mesh
+CSX = CSXCAD.ContinuousStructure()
+CSX = AutoMeshCSXWrapper(CSX, AutoMesh)
+FDTD.SetCSX(CSX)
+mesh = CSX.GetGrid()
+mesh.SetDeltaUnit(unit)
 
 ## Add bounding sim_box
 sim_box = CSX.AddMaterial('sim_box', epsilon=1)
 start = [-MSL_length, -15*MSL_width,             0]
 stop  = [+MSL_length, +15*MSL_width+stub_length, 3000]
 obj = sim_box.AddBox(start, stop, priority=0)
-primitives_mesh_setup[obj] = mesh_hint_common
 
 ## Add the substrate
 substrate = CSX.AddMaterial('RO4350B', epsilon=substrate_epr)
 start = [-MSL_length, -15*MSL_width,             0]
 stop  = [+MSL_length, +15*MSL_width+stub_length, substrate_thickness]
 obj = substrate.AddBox(start, stop, priority=100)
-primitives_mesh_setup[obj] = mesh_hint_common
 
 ## MSL line and stub
 port = [None, None]
@@ -76,28 +128,27 @@ pec = CSX.AddMetal('PEC')
 start = [-MSL_length, -MSL_width/2, substrate_thickness]
 stop  = [ MSL_length,  MSL_width/2, substrate_thickness]
 obj = pec.AddBox(start, stop, priority=200)
-primitives_mesh_setup[obj] = mesh_hint_common
 
 start = [-MSL_width/2,  MSL_width/2, substrate_thickness]
 stop  = [ MSL_width/2,  MSL_width/2+stub_length, substrate_thickness]
 obj = pec.AddBox(start, stop, priority=200)
-primitives_mesh_setup[obj] = mesh_hint_common
 
 ## Ports
 port_start = [-MSL_length+10*resolution, -MSL_width/2, substrate_thickness]
 port_stop  = [-MSL_length+10*resolution,  MSL_width/2, 0.0]
 port[0] = FDTD.AddLumpedPort(1, MSL_Zc, port_start, port_stop, 'z', 1.0, priority=900)
-primitives_mesh_setup[port[0]] = mesh_hint_common
 
 port_start = [ MSL_length-10*resolution, -MSL_width/2, substrate_thickness]
 port_stop  = [ MSL_length-10*resolution,  MSL_width/2, 0.0]
 port[1] = FDTD.AddLumpedPort(2, MSL_Zc, port_start, port_stop, 'z', 0.0, priority=900)
-primitives_mesh_setup[port[1]] = mesh_hint_common
+
 
 ### Create auto mesh
-AM.GenMesh(CSX, global_mesh_setup, primitives_mesh_setup, properties_mesh_setup)
+AutoMesh.GenMesh(CSX, AutoMesh.global_mesh_setup, AutoMesh.primitives_mesh_setup, AutoMesh.properties_mesh_setup)
 
+# Manual overwride since z dir not meshed correctly
 mesh = CSX.GetGrid()
+mesh.ClearLines('z')
 mesh.AddLine('z', np.linspace(0,substrate_thickness,5))
 mesh.AddLine('z', 3000)
 mesh.SmoothMeshLines('z', resolution)
@@ -108,6 +159,7 @@ start = [mesh.GetLines('x')[ 0]] + [mesh.GetLines('y')[ 0]] + [substrate_thickne
 stop  = [mesh.GetLines('x')[-1]] + [mesh.GetLines('y')[-1]] + [substrate_thickness/2]
 Et.AddBox(start, stop)
 
+
 ### Run the simulation
 if 1:  # debugging only
     CSX_file = os.path.join(Sim_Path, 'notch.xml')
@@ -117,7 +169,7 @@ if 1:  # debugging only
     from CSXCAD import AppCSXCAD_BIN
     os.system(AppCSXCAD_BIN + ' "{}"'.format(CSX_file))
 
-quit()
+
 if not post_proc_only:
     FDTD.Run(Sim_Path, cleanup=True)
 
