@@ -97,7 +97,9 @@ primitives_mesh_setup[port[1]] = mesh_hint_common
 ### Create auto mesh
 AM.GenMesh(CSX, global_mesh_setup, primitives_mesh_setup, properties_mesh_setup)
 
+# Manual overwride since z dir not meshed correctly
 mesh = CSX.GetGrid()
+mesh.ClearLines('z')
 mesh.AddLine('z', np.linspace(0,substrate_thickness,5))
 mesh.AddLine('z', 3000)
 mesh.SmoothMeshLines('z', resolution)
