@@ -18,11 +18,9 @@ from CSXCAD  import ContinuousStructure
 from openEMS import openEMS
 
 from openEMS.physical_constants import *
-import matplotlib.pyplot as plt
-# from CSXCAD.CSPrimitives import primitives_mesh_setup
-# from CSXCAD.CSProperties import properties_mesh_setup
-from Automesher import Automesher
-from CSXCAD.SmoothMeshLines import SmoothMeshLines
+
+sys.path.append(os.path.join(os.path.dirname(__file__), 'automesher_tools'))
+from automesher_tools.automesher_main import GenerateMesh, enhance_csx_for_auto_mesh, enhance_FDTD_for_auto_mesh
 
 ### General parameter setup
 Sim_Path = os.path.realpath(os.path.join('.', 'Simple_Patch_Antenna_Test_automesh_points'))
@@ -61,18 +59,6 @@ fc = 0.4e9 # 20 dB corner frequency
 ### FDTD setup
 ## * Limit the simulation to 30k timesteps
 ## * Define a reduced end criteria of -40dB
-FDTD = openEMS(NrTS=30000, EndCriteria=1e-4)
-FDTD.SetGaussExcite( f0, fc )
-FDTD.SetBoundaryCond( ['MUR', 'MUR', 'MUR', 'MUR', 'MUR', 'MUR'] )
-
-
-CSX = ContinuousStructure()
-
-FDTD.SetCSX(CSX)
-mesh = CSX.GetGrid()
-mesh.SetDeltaUnit(1e-3)
-mesh_res = C0/(f0+fc)/1e-3/20
-# mesh_res=int(1)
 
 global_mesh_setup = {
     'dirs': 'xy',
@@ -86,6 +72,21 @@ global_mesh_setup = {
 }
 properties_mesh_setup={}
 primitives_mesh_setup={}
+
+FDTD = openEMS(NrTS=30000, EndCriteria=1e-4)
+FDTD.SetGaussExcite( f0, fc )
+FDTD.SetBoundaryCond( ['MUR', 'MUR', 'MUR', 'MUR', 'MUR', 'MUR'] )
+
+
+CSX = ContinuousStructure()
+
+FDTD.SetCSX(CSX)
+mesh = CSX.GetGrid()
+mesh.SetDeltaUnit(1e-3)
+mesh_res = C0/(f0+fc)/1e-3/20
+
+CSX = enhance_csx_for_auto_mesh(CSX, primitives_mesh_setup)
+FDTD = enhance_FDTD_for_auto_mesh(FDTD, primitives_mesh_setup)
 
 ### Generate properties, primitives and mesh-grid
 #initialize the mesh with the "air-box" dimensions
@@ -101,7 +102,7 @@ mesh_hint = {
     'mesh_resolution' : mesh_res
 }
 patch = CSX.AddMetal( 'patch') # create a perfect electric conductor (PEC)
-properties_mesh_setup[patch] = mesh_hint
+# properties_mesh_setup[patch] = mesh_hint
 
 start = [-patch_width/2, substrate_length/2-patch_length-delta, substrate_thickness]
 stop  = [ patch_width/2, substrate_length/2 -delta            , substrate_thickness]
@@ -114,20 +115,11 @@ mesh_hint = {
 # primitives_mesh_setup[box1] = mesh_hint
 
 # FDTD.AddEdges2Grid(dirs='xy', properties=patch, metal_edge_res=mesh_res/2)
-mesh_hint = {
 
-    'dirs': 'xy'
-}
 # air1 = CSX.AddMaterial( 'air1', epsilon=1, kappa=0) # create a perfect electric conductor (PEC)
 # properties_mesh_setup[air1] = mesh_hint
 start = [-msl_width-msl_width/2, substrate_length/2-patch_length-delta   , substrate_thickness]
 stop  = [-msl_width/2          , substrate_length/2-patch_length-delta+ls, substrate_thickness]
-mesh_hint = {
-
-    'dirs': 'xy'
-}
-# asd = air1.AddBox(priority=0, start=start, stop=stop, mesh_hint=mesh_hint) 
-# FDTD.AddEdges2Grid(dirs='xy', properties=air1, metal_edge_res=mesh_res/2)
 
 start = [msl_width/2            , substrate_length/2-patch_length-delta   , substrate_thickness]
 stop  = [msl_width/2 + msl_width, substrate_length/2-patch_length-delta+ls, substrate_thickness]
@@ -165,7 +157,7 @@ y= [20 ,  20, -1, -7, -16, -16,-10,  -2,   -2, -2, -20, -20, 20]
 # Generate a circle using polygon with x and y coordinates
 circle_radius = 20
 num_points = 50
-theta = np.linspace(0, 2 * np.pi, num_points)
+theta = np.linspace(0, 2* np.pi, num_points)
 x = circle_radius * np.cos(theta)
 y = circle_radius * np.sin(theta)
 
@@ -196,7 +188,7 @@ mesh_hint = {
      'metal_edge_res': None, 'dirs': 'xy'
 }
 polygon1 = patch.AddPolygon(points, 'z', elevation = substrate_thickness, priority = 1000)
-primitives_mesh_setup[polygon1] = mesh_hint
+# primitives_mesh_setup[polygon1] = mesh_hint
 # plt.plot(x,y,marker='o')
 # plt.show()
 # FDTD.AddEdges2Grid(dirs='xy', properties= patch, metal_edge_res=mesh_res/2)
@@ -230,8 +222,7 @@ P=[]
 P=L[0].GetAllPrimitives()
 # print (P[0])
 # print (L[0])
-MM = Automesher()
-MM.GenMesh(CSX, global_mesh_setup,primitives_mesh_setup,properties_mesh_setup)
+GenerateMesh(CSX, global_mesh_setup,primitives_mesh_setup,properties_mesh_setup)
 # print(primitives_mesh_setup)
 # print(properties_mesh_setup)
 # print(primitives_mesh_setup)
