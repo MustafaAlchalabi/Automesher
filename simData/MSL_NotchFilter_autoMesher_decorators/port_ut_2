@@ -1,0 +1,10 @@
+% time-domain voltage integration by openEMS v0.0.36-16-g7d7688a @Mon Jun 16 10:26:43 2025
+% start-coordinates: (0.0455227,0,0.000254) m -> [203,42,4]
+% stop-coordinates: (0.0455227,0,0) m -> [203,42,0]
+% t/s	voltage
+0	-0
+1.77869030571e-11	-0
+3.55738061141e-11	-0
+5.33607091712e-11	-0
+7.11476122282e-11	-0
+8.89345152853e-11	-0
