@@ -18,9 +18,9 @@ from pylab import *
 from CSXCAD  import ContinuousStructure
 from openEMS import openEMS
 from openEMS.physical_constants import *
-from Automesher import Automesher
-from CSXCAD.SmoothMeshLines import SmoothMeshLines
-
+sys.path.append(os.path.join(os.path.dirname(__file__), 'automesher_tools'))
+from automesher_tools.automesher_main import GenerateMesh, enhance_csx_for_auto_mesh, enhance_FDTD_for_auto_mesh
+# from decorate_oroginal_methods import *
 
 
 # preview model/mesh only?
@@ -70,11 +70,31 @@ max_cellsize = wavelength_air/(sqrt(eps_max)*20) # max cellsize is lambda/20 in 
  
 
 ############ Geometry setup ############
+
 CSX = ContinuousStructure()
 FDTD.SetCSX(CSX)
 mesh = CSX.GetGrid()
 mesh.SetDeltaUnit(unit)
 
+primitives_mesh_setup = {}
+
+properties_mesh_setup = {}
+
+global_mesh_setup = {
+    # 'dirs': 'xyz',
+    'drawing_unit': unit,
+    'start_frequency': fstart,
+    'stop_frequency': fstop,
+    'mesh_resolution': 'medium',
+    'use_circle_detection': True, 
+    # 'refined_cellsize': 10,
+    # 'min_cellsize': 0.5,
+    # 'num_lines': 3,
+    # 'max_cellsize': max_cellsize,
+}
+
+CSX = enhance_csx_for_auto_mesh(CSX, primitives_mesh_setup)
+FDTD = enhance_FDTD_for_auto_mesh(FDTD, primitives_mesh_setup)
 
 # silicon substrate
 Sub = CSX.AddMaterial('Sub', epsilon=11.9, kappa=2)
@@ -209,12 +229,7 @@ Cont = CSX.AddMaterial('Cont', kappa=Cont_sigma)
 
 
 ############# begin layout geometries ###########
-primitives_mesh_setup = {}
 # Cell ('L_2n0_simplify", 10 polygons, 0 paths, 2 labels, 0 references)
-mesh_hint = {
-
-     'metal_edge_res': None, 'dirs': 'xyz'
-}
 pts_x = np.array([])
 pts_y = np.array([])
 pts_x = r_[pts_x, 22.200]
@@ -229,7 +244,7 @@ pts_x = r_[pts_x, 22.200]
 pts_y = r_[pts_y, 0.000]
 pts = np.array([pts_x, pts_y])
 polygon1 = TopMetal1.AddLinPoly(priority=100, points=pts, norm_dir ='z', elevation=TopMetal1_zmin, length=TopMetal1_thick)
-primitives_mesh_setup[polygon1] = mesh_hint
+# primitives_mesh_setup[polygon1] = mesh_hint
 
 
 pts_x = np.array([])
@@ -246,24 +261,9 @@ pts_x = r_[pts_x, -34.200]
 pts_y = r_[pts_y, 0.000]
 pts = np.array([pts_x, pts_y])
 polygon2 = TopMetal1.AddLinPoly(priority=100, points=pts, norm_dir ='z', elevation=TopMetal1_zmin, length=TopMetal1_thick)
-primitives_mesh_setup[polygon2] = mesh_hint
-# polygon2 = TopMetal2.AddPolygon(priority=200, points=pts, norm_dir ='z', elevation=TopMetal1_zmin)
-# primitives_mesh_setup[polygon2] = mesh_hint
+# # primitives_mesh_setup[polygon2] = mesh_hint
 
-# mesh_hint = {
-#         'metal_edge_res': None, 'dirs': 'xyz'
-#     }
-# x = [-15,-15,-5,5,15.2,15.2,5,-5,-15]
-# y = [-10,-6, -6,10,10,6,6,-10,-10]
-# x = [i+65 for i in x]
-# y = [i+180 for i in y]
-# points = [x,y]
-# polygon3 = TopMetal2.AddLinPoly(priority=200, points=points, norm_dir ='z', elevation=TopMetal1_zmin, length=20)
-# primitives_mesh_setup[polygon3] = mesh_hint
 
-mesh_hint = {
-        'metal_edge_res': None, 'dirs': 'xyz'
-    }
 pts_x = np.array([])
 pts_y = np.array([])
 pts_x = r_[pts_x, -23.230]
@@ -285,7 +285,7 @@ pts_y = r_[pts_y, 284.000]
 
 pts = np.array([pts_x, pts_y])
 polygon3 = TopMetal1.AddLinPoly(priority=100, points=pts, norm_dir ='z', elevation=TopMetal1_zmin, length=TopMetal1_thick)
-primitives_mesh_setup[polygon3] = mesh_hint
+# primitives_mesh_setup[polygon3] = mesh_hint
 
 pts_x = np.array([])
 pts_y = np.array([])
@@ -315,25 +315,8 @@ pts_x = r_[pts_x, 11.230]
 pts_y = r_[pts_y, 269.000]
 
 pts = np.array([pts_x, pts_y])
-# Rotate the polygon around the z-axis by 45 degrees
-# rotation_matrix = np.array([[cos(pi/4), -sin(pi/4)], [sin(pi/4), cos(pi/4)]])
-# rotated_pts = np.dot(rotation_matrix, pts)
-
-# # Create the rotated polygon
-# rotated_polygon = TopMetal2.AddLinPoly(priority=200, points=rotated_pts, norm_dir='z', elevation=TopMetal2_zmin, length=TopMetal2_thick)
-# primitives_mesh_setup[rotated_polygon] = mesh_hint
 polygon4 = TopMetal2.AddLinPoly(priority=100, points=pts, norm_dir ='z', elevation=TopMetal2_zmin, length=TopMetal2_thick)
-primitives_mesh_setup[polygon4] = mesh_hint
-
-# start = [-80,160,TopMetal2_zmin]
-# stop = [-40,200,TopMetal2_zmin+5]
-# box1 = TopMetal2.AddBox(priority=200, start=start, stop=stop)
-# primitives_mesh_setup[box1] = mesh_hint
-
-# start = [-30,80,TopMetal2_zmin]
-# stop = [30,110,TopMetal2_zmin]
-# box1 = TopMetal2.AddBox(priority=200, start=start, stop=stop)
-# primitives_mesh_setup[box1] = mesh_hint
+# primitives_mesh_setup[polygon4] = mesh_hint
 
 pts_x = np.array([])
 pts_y = np.array([])
@@ -404,8 +387,7 @@ pts_y = r_[pts_y, 57.000]
 
 pts = np.array([pts_x, pts_y])
 polygon5 = TopMetal2.AddLinPoly(priority=100, points=pts, norm_dir ='z', elevation=TopMetal2_zmin, length=TopMetal2_thick)
-primitives_mesh_setup[polygon5] = mesh_hint
-
+# primitives_mesh_setup[polygon5] = mesh_hint
 
 pts_x = np.array([])
 pts_y = np.array([])
@@ -420,7 +402,7 @@ pts_y = r_[pts_y, 283.370]
 
 pts = np.array([pts_x, pts_y])
 polygon6 = TopVia2.AddLinPoly(priority=100, points=pts, norm_dir ='z', elevation=TopVia2_zmin, length=TopVia2_thick)
-primitives_mesh_setup[polygon6] = mesh_hint
+# primitives_mesh_setup[polygon6] = mesh_hint
 
 pts_x = np.array([])
 pts_y = np.array([])
@@ -439,11 +421,10 @@ radius = diameter/2.0
 theta = np.linspace(0, 2*np.pi, 50)
 pts_x = radius * np.cos(theta) + (11.850 + radius)
 pts_y = radius * np.sin(theta) + (257.620 + radius)
-# ensure the circle is closed by adding the first point at the end
 
 pts = np.array([pts_x, pts_y])
 polygon7 = TopVia2.AddLinPoly(priority=100, points=pts, norm_dir ='z', elevation=TopVia2_zmin, length=TopVia2_thick)
-primitives_mesh_setup[polygon7] = mesh_hint
+# primitives_mesh_setup[polygon7] = mesh_hint
 
 pts_x = np.array([])
 pts_y = np.array([])
@@ -458,7 +439,7 @@ pts_y = r_[pts_y, 56.370]
 
 pts = np.array([pts_x, pts_y])
 polygon8 = TopVia2.AddLinPoly(priority=100, points=pts, norm_dir ='z', elevation=TopVia2_zmin, length=TopVia2_thick)
-primitives_mesh_setup[polygon8] = mesh_hint
+# primitives_mesh_setup[polygon8] = mesh_hint
 
 pts_x = np.array([])
 pts_y = np.array([])
@@ -484,7 +465,7 @@ pts_y = np.r_[pts_y, pts_y[0]]
 
 pts = np.array([pts_x, pts_y])
 polygon9 = TopVia2.AddLinPoly(priority=50, points=pts, norm_dir ='z', elevation=TopVia2_zmin, length=TopVia2_thick)
-primitives_mesh_setup[polygon9] = mesh_hint
+# primitives_mesh_setup[polygon9] = mesh_hint
 
 # Bounding box of geometry
 geometry_xmin= -127.000
@@ -499,7 +480,7 @@ geometry_ymax= 284.000
 
 # port in x direction, 50 Ohm reference impedance
 port = FDTD.AddLumpedPort(1, 50, [-22.2, 0, TopMetal1_zmin], [22.2, 10, TopMetal1_zmax], 'x', 1.0, priority=300)
-primitives_mesh_setup[port] = {'metal_edge_res': None, 'dirs': 'xyz'}
+# primitives_mesh_setup[port] = {'metal_edge_res': None, 'dirs': 'xyz'}
 #################  end ports  ################
 
 geometry_width = geometry_xmax - geometry_xmin
@@ -512,16 +493,13 @@ box_ymin = geometry_ymin - 1.0 * geometry_height
 box_ymax = geometry_ymax + 1.0 * geometry_height
 
 # create boxes for substrate, oxide etc that are not drawn in GDSII layout
-mesh_hint = {
-    'dirs': 'xyz', 'edges_only': False
-}
+
 Sub = Sub.AddBox(priority=10, start=[box_xmin, box_ymin, Sub_zmin], stop=[box_xmax, box_ymax, Sub_zmax])
 EPI = EPI.AddBox(priority=10, start=[box_xmin, box_ymin, EPI_zmin], stop=[box_xmax, box_ymax, EPI_zmax])
 SiO2 = SiO2.AddBox(priority=10, start=[box_xmin, box_ymin, SiO2_zmin], stop=[box_xmax, box_ymax, SiO2_zmax])
-primitives_mesh_setup[Sub] = mesh_hint
-primitives_mesh_setup[EPI] = mesh_hint
-primitives_mesh_setup[SiO2] = mesh_hint
-
+# primitives_mesh_setup[Sub] = mesh_hint
+# primitives_mesh_setup[EPI] = mesh_hint
+# primitives_mesh_setup[SiO2] = mesh_hint
 
 
 # ############# create vertical mesh  #############
@@ -599,39 +577,21 @@ def add_graded_meshlines (axis, start, stop, stepstart, factor, maxstep):
 
 
 ############ build final mesh ##########
-mesh.AddLine('x', box_xmin)
-mesh.AddLine('x', box_xmax)
+# mesh.AddLine('x', box_xmin)
+# mesh.AddLine('x', box_xmax)
 
-mesh.AddLine('y', box_ymin)
-mesh.AddLine('y', box_ymax)
+# mesh.AddLine('y', box_ymin)
+# mesh.AddLine('y', box_ymax)
 
-mesh.AddLine('z', Air_zmax)
-mesh.AddLine('z', Sub_zmin)
+# mesh.AddLine('z', Air_zmax)
+# mesh.AddLine('z', Sub_zmin)
 # # refine mesh in conductor regions
 # add_equal_meshlines('x', geometry_xmin, geometry_xmax, round(geometry_width/refined_cellsize))
 # add_equal_meshlines('y', geometry_ymin, geometry_ymax, round(geometry_height/refined_cellsize))
 
 # don't smooth mesh in z-direction, that is already final!
 
-global_mesh_setup = {
-    'dirs': 'xyz',
-    'drawing_unit': unit,
-    'start_frequency': fstart,
-    'stop_frequency': fstop,
-    'mesh_resolution': 'medium',
-    'use_circle_detection': True, 
-    # 'refined_cellsize': 10,
-    # 'min_cellsize': 0.5,
-    # 'num_lines': 3,
-    # 'max_cellsize': max_cellsize,
-}
-
-properties_mesh_setup = {}
-AM = Automesher()
-
-AM.GenMesh(CSX, global_mesh_setup,primitives_mesh_setup,properties_mesh_setup)
-
-
+GenerateMesh(CSX, global_mesh_setup,primitives_mesh_setup,properties_mesh_setup)
 
 # mesh.SmoothMeshLines('all', wavelength_air/2, 1.3)
 

@@ -1284,10 +1284,14 @@ class Automesher:
             return []
         if isinstance(polygon, list):
             coords = [prim.GetCoords() for prim in polygon if hasattr(prim, 'GetCoords')]
+            if not coords:
+                return []
             x_coords = np.concatenate([coord[0] for coord in coords])
             y_coords = np.concatenate([coord[1] for coord in coords])
         else:                
             coords = polygon.GetCoords()
+            if not coords:
+                return []
             x_coords = np.array(coords[0])
             y_coords = np.array(coords[1])
         N = len(x_coords)
@@ -1298,14 +1302,20 @@ class Automesher:
         for start in range(N - min_points + 1):
             for length in range(min_points, N - start + 1):
                 indices = tuple(range(start, start + length))
+                print('indices:', indices)
 
                 # Falls diese Punkte schon Teil eines gefundenen Kreises sind, überspringen
                 if any(i in used_indices for i in indices):
+                    print('Skipping indices due to overlap with found segments')
                     continue
+                print('x_coords:', x_coords)
+                print('y_coords:', y_coords)
+                print('list(indices):', list(indices))
 
                 sub_x = x_coords[list(indices)]
                 sub_y = y_coords[list(indices)]
-
+                print('sub_x:', sub_x)
+                print('sub_y:', sub_y)
                 # Mittelpunkt-Näherung
                 x0, y0 = np.mean(sub_x), np.mean(sub_y)
                 radii = np.sqrt((sub_x - x0)**2 + (sub_y - y0)**2)

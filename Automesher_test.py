@@ -11,7 +11,7 @@
 """
 
 ### Import Libraries
-import os, tempfile
+import os
 from pylab import *
 
 from CSXCAD  import ContinuousStructure
@@ -20,12 +20,8 @@ from openEMS import openEMS
 from openEMS.physical_constants import *
 import matplotlib.pyplot as plt
 
-from pycallgraph import PyCallGraph
-from pycallgraph.output import GraphvizOutput
-# from CSXCAD.CSPrimitives import primitives_mesh_setup
-# from CSXCAD.CSProperties import properties_mesh_setup
-from Automesher import Automesher
-from CSXCAD.SmoothMeshLines import SmoothMeshLines
+sys.path.append(os.path.join(os.path.dirname(__file__), 'automesher_tools'))
+from automesher_tools.automesher_main import GenerateMesh, enhance_csx_for_auto_mesh, enhance_FDTD_for_auto_mesh
 
 ### General parameter setup
 Sim_Path = os.path.realpath(os.path.join('.', 'Simple_Patch_Antenna_Test_automesh_points'))
@@ -61,6 +57,17 @@ SimBox = np.array([150, 150, 100])*2
 f0 = 200e6 # center frequency
 fc = 200e6 # 20 dB corner frequency
 
+global_mesh_setup = {
+    'dirs': 'xyz',
+    'mesh_resolution': 'medium',
+    'drawing_unit': 1e-3,
+    # 'min_cellsize': 3,
+    'f0' : f0,
+    'fc' : fc,
+}
+properties_mesh_setup={}
+primitives_mesh_setup={}
+
 ### FDTD setup
 ## * Limit the simulation to 30k timesteps
 ## * Define a reduced end criteria of -40dB
@@ -77,16 +84,8 @@ mesh.SetDeltaUnit(1e-3)
 mesh_res = C0/(f0+fc)/1e-3/20
 # mesh_res=int(1)
 
-global_mesh_setup = {
-    'dirs': 'xyz',
-    'mesh_resolution': 'medium',
-    'drawing_unit': 1e-3,
-    # 'min_cellsize': 3,
-    'f0' : f0,
-    'fc' : fc,
-}
-properties_mesh_setup={}
-primitives_mesh_setup={}
+CSX = enhance_csx_for_auto_mesh(CSX, primitives_mesh_setup)
+FDTD = enhance_FDTD_for_auto_mesh(FDTD, primitives_mesh_setup)
 
 ### Generate properties, primitives and mesh-grid
 #initialize the mesh with the "air-box" dimensions
@@ -95,30 +94,15 @@ mesh.AddLine('y', [-SimBox[1]/2, SimBox[1]/2]          )
 mesh.AddLine('z', [-SimBox[2]/3, SimBox[2]*2/3]        )
 metal_edge_res=mesh_res/2
 # create patch
-mesh_hint = {
 
-    'dirs': 'x',
-    'metal_edge_res' : None,
-    'mesh_resolution' : mesh_res
-}
 patch = CSX.AddMetal( 'patch') # create a perfect electric conductor (PEC)
-properties_mesh_setup[patch] = mesh_hint
-
 start = [-patch_width/2, substrate_length/2-patch_length-delta, substrate_thickness]
 stop  = [ patch_width/2, substrate_length/2 -delta            , substrate_thickness]
-mesh_hint = {
-
-    'dirs': 'xy',
-    # 'metal_edge_res': 0.5,
-}
 # box1=patch.AddBox(priority=1, start=start, stop=stop) # add a box-primitive to the metal property 'patch'
 # primitives_mesh_setup[box1] = mesh_hint
 
 # FDTD.AddEdges2Grid(dirs='xy', properties=patch, metal_edge_res=mesh_res/2)
-mesh_hint = {
 
-    'dirs': 'xy'
-}
 # air1 = CSX.AddMaterial( 'air1', epsilon=1, kappa=0) # create a perfect electric conductor (PEC)
 # properties_mesh_setup[air1] = mesh_hint
 start = [-msl_width-msl_width/2, substrate_length/2-patch_length-delta   , substrate_thickness]
@@ -158,13 +142,16 @@ y = [i *2 for i in y]
 # gap = 6
 # x= [-10,  0, 0, -3,  3, gap,  gap, 10,  10, -10, -10]
 # y= [10 , 10, 5, -5, -5,   5,   10, 10, -10, -10, 10]
+
+
+
 points = [x,y]
 mesh_hint = {
 
      'metal_edge_res': None, 'dirs': 'xy'
 }
 polygon1 = patch.AddPolygon(points, 'z', elevation = substrate_thickness, priority = 1000)
-primitives_mesh_setup[polygon1] = mesh_hint
+# primitives_mesh_setup[polygon1] = mesh_hint
 plt.plot(x,y,marker='o')
 # plt.show()
 # FDTD.AddEdges2Grid(dirs='xy', properties= patch, metal_edge_res=mesh_res/2)
@@ -177,10 +164,10 @@ plt.plot(x,y,marker='o')
 # FDTD.AddEdges2Grid(dirs='xy', properties=msl, metal_edge_res=mesh_res/2)
 
 # create substrate
-# substrate = CSX.AddMaterial( 'substrate', epsilon=substrate_epsR, kappa=substrate_kappa)
+substrate = CSX.AddMaterial( 'substrate', epsilon=substrate_epsR, kappa=substrate_kappa)
 start = [-substrate_width/2, -substrate_length/2, 0]             
 stop  = [ substrate_width/2, substrate_length/2 , substrate_thickness]
-# substrate.AddBox( priority=1, start=start, stop=stop )
+substrate.AddBox( priority=1, start=start, stop=stop )
 
 # add extra cells to discretize the substrate thickness
 # mesh.AddLine('z', linspace(0,substrate_thickness,substrate_cells+1))
@@ -198,8 +185,7 @@ P=[]
 P=L[0].GetAllPrimitives()
 # print (P[0])
 # print (L[0])
-MM = Automesher()
-MM.GenMesh(CSX, global_mesh_setup,primitives_mesh_setup,properties_mesh_setup)
+GenerateMesh(CSX, global_mesh_setup,primitives_mesh_setup,properties_mesh_setup)
 # print(primitives_mesh_setup)
 # print(properties_mesh_setup)
 # print(primitives_mesh_setup)
