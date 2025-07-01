@@ -15,8 +15,8 @@ from automesher_tools.automesher_main import GenerateMesh, enhance_csx_for_auto_
 Sim_Path = os.path.realpath(os.path.join('.', 'MUT_Taro'))
 
 
-post_proc_only = False
-preview_only = True
+post_proc_only = True
+preview_only = False
 
 unit = 1e-6
 
@@ -66,7 +66,8 @@ global_mesh_setup = {
     'drawing_unit': unit,
     'start_frequency': f_start,
     'stop_frequency': f_stop,
-    'mesh_resolution': 'medium',
+    'mesh_resolution': 'high',
+    'boundary_distance': [lambda0, lambda0, None, None, None, None], # value, 'auto' or None
     # 'refined_cellsize': mesh_res_MUT,
     # 'max_cellsize': mesh_res*15,
     # 'min_cellsize': mesh_res/2,
@@ -197,7 +198,6 @@ Box7 = MUT_material.AddBox(priority=100, start=start, stop=stop)
 # mesh.AddLine('y', [-19000-lambda0/2, 19000+lambda0/2])
 
 properties_mesh_setup = {}
-print('primitives_mesh_setup:', primitives_mesh_setup)
 GenerateMesh(CSX, global_mesh_setup, primitives_mesh_setup, properties_mesh_setup)
 
 
@@ -254,4 +254,4 @@ legend()
 
 
 
-show()
+# show()

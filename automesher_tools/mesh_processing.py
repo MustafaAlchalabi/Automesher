@@ -77,7 +77,6 @@ def smooth_and_process_mesh_lines(automesher, mesh_data, polygon, x_edges, y_edg
         mesh_map[1].sort(key=lambda epsilon: epsilon[2], reverse=True)
     if mesh_map[2]:
         mesh_map[2].sort(key=lambda epsilon: epsilon[2], reverse=True)
-        print('mesh_map_z:', mesh_map[2])
 
     lines_to_be_smoothed = [[], [], []]
     for map in mesh_map[0]:
@@ -170,28 +169,14 @@ def process_mesh_lines(automesher, grid):
     x_edges.sort(key=lambda edge: edge[0])
     y_edges.sort(key=lambda edge: edge[0]) 
 
-    # x, y, z = automesher.mesh_data.get('x', [x, None]), automesher.mesh_data.get('y', [y, None]), automesher.mesh_data.get('z', [z, None]) 
-    # print('mesh_data:', [value[0][0] for value in list(automesher.mesh_data.values())])
-    # x, y, z = [value[0][0] for value in list(automesher.mesh_data.values())], [value[0][1] for value in list(automesher.mesh_data.values())], [value[0][2] for value in list(automesher.mesh_data.values())]
-    # # z = [item for sublist in z for item in sublist if sublist is not None]
-    # x = [item for sublist in x for item in sublist if sublist is not None]
-    # y = [item for sublist in y for item in sublist if sublist is not None]
-    # if not x:
-    #     x = grid.GetLines(0)
-    # if not y:
-    #     y = grid.GetLines(1)
-    # if z[0] is None:
-    #     z = grid.GetLines(2)
-    # else:
-    #     z = [item for sublist in z for item in sublist if sublist is not None]
 
     zz_tuples = [(z, None) for z in z]
     mesh_data = [[], [], z]
     # self.mesh_small_gaps(zz_tuples, automesher.mesh_res, automesher.max_res, automesher.num_lines, mesh_data, 'z')
     z = np.append(mesh_data[2], z)
     z = np.unique(z)
-    lines = [[SmoothMeshLines(x, automesher.max_cellsize/2, 1.3)], [SmoothMeshLines(y, automesher.max_cellsize/2, 1.3)], [SmoothMeshLines(z, automesher.max_cellsize/2, 1.3)]]
-    # for i in range(1, len(np.diff(lines[2][0])) - 1):
+    lines = [SmoothMeshLines(x, automesher.max_cellsize/2, 1.3), SmoothMeshLines(y, automesher.max_cellsize/2, 1.3), SmoothMeshLines(z, automesher.max_cellsize/2, 1.3)]
+    # for i in range(1, len(np.diff(lines[2])) - 1):
     #     # check if the difference between two consecutive z values is greater than 2 times the difference between the next two consecutive z values
     #     if i + 1 < len(lines[2][0]) and np.round(np.diff(lines[2][0])[i] / np.diff(lines[2][0])[i + 1], 1) > 2 and np.diff(lines[2][0])[i] > automesher.min_cellsize:
     #         lines[2][0] = list(lines[2][0])  # Convert to list
@@ -200,48 +185,58 @@ def process_mesh_lines(automesher, grid):
     # Check lines between x edges
     for i in range(len(x_edges) - 1):
         if abs(x_edges[i][0] - x_edges[i + 1][0]) > automesher.mesh_res:
-            lines_in_range = [line for line in lines[0][0] if x_edges[i][0] < line < x_edges[i + 1][0]]
+            lines_in_range = [line for line in lines[0] if x_edges[i][0] < line < x_edges[i + 1][0]]
             if not lines_in_range:
-                lines[0][0] = np.append(lines[0][0], np.linspace(x_edges[i][0], x_edges[i + 1][0], automesher.num_lines))
+                lines[0] = np.append(lines[0], np.linspace(x_edges[i][0], x_edges[i + 1][0], automesher.num_lines))
     # Check lines between y edges
     for i in range(len(y_edges) - 1):
         if abs(y_edges[i][0] - y_edges[i + 1][0]) > automesher.mesh_res:
-            lines_in_range = [line for line in lines[1][0] if y_edges[i][0] < line < y_edges[i + 1][0]]
+            lines_in_range = [line for line in lines[1] if y_edges[i][0] < line < y_edges[i + 1][0]]
             if not lines_in_range:
-                lines[1][0] = np.append(lines[1][0], np.linspace(y_edges[i][0], y_edges[i + 1][0], automesher.num_lines))
+                lines[1] = np.append(lines[1], np.linspace(y_edges[i][0], y_edges[i + 1][0], automesher.num_lines))
 
+#     automesher.global_mesh_setup:'boundary_distance': [ 1000, 1000, 1000, 1000, 1000, 1000 ], # value, auto or None
     graded_lines_y = []
     graded_lines_x = []
     graded_lines_z = []
 
+    distance = automesher.global_mesh_setup.get('boundary_distance', [0, 0, 0, 0, 0, 0])
+    for i in range(len(distance)):
+        if distance[i] == 'auto':
+            distance[i] = automesher.wave_length
+        elif distance[i] is None:
+            distance[i] = 0
+
     if xmax in x_mesh_data:
-        x= np.append(x, xmax+automesher.wave_length)
-        graded_lines_x.extend(meshing_utils.add_graded_mesh_lines(np.max(lines[0][0]), xmax+automesher.wave_length, abs(np.max(lines[0][0])- lines[0][0][np.argmax(lines[0][0]) - 1]), automesher.max_cellsize_air, 1.3))
+        x= np.append(x, xmax+distance[0])
+        graded_lines_x.extend(meshing_utils.add_graded_mesh_lines(np.max(lines[0]), xmax+distance[0], abs(np.max(lines[0])- lines[0][np.argmax(lines[0]) - 1]), automesher.max_cellsize_air, 1.3))
     if xmin in x_mesh_data:
-        x= np.append(x, xmin-automesher.wave_length)
-        graded_lines_x.extend(meshing_utils.add_graded_mesh_lines(np.min(lines[0][0]), xmin-automesher.wave_length, abs(np.min(lines[0][0]) - lines[0][0][np.argmin(lines[0][0]) + 1]), automesher.max_cellsize_air, 1.3))
+        x= np.append(x, xmin-distance[1])
+        graded_lines_x.extend(meshing_utils.add_graded_mesh_lines(np.min(lines[0]), xmin-distance[1], abs(np.min(lines[0]) - lines[0][np.argmin(lines[0]) + 1]), automesher.max_cellsize_air, 1.3))
     if ymax in y_mesh_data:
-        y= np.append(y, ymax+automesher.wave_length)
-        graded_lines_y.extend(meshing_utils.add_graded_mesh_lines(np.max(lines[1][0]), ymax+automesher.wave_length, abs(np.max(lines[1][0])- lines[1][0][np.argmax(lines[1][0]) - 1]), automesher.max_cellsize_air, 1.3))
+        y= np.append(y, ymax+distance[2])
+        graded_lines_y.extend(meshing_utils.add_graded_mesh_lines(np.max(lines[1]), ymax+distance[2], abs(np.max(lines[1])- lines[1][np.argmax(lines[1]) - 1]), automesher.max_cellsize_air, 1.3))
     if ymin in y_mesh_data:
-        y= np.append(y, ymin-automesher.wave_length)
-        graded_lines_y.extend(meshing_utils.add_graded_mesh_lines(np.min(lines[1][0]), ymin-automesher.wave_length, abs(np.min(lines[1][0]) - lines[1][0][np.argmin(lines[1][0]) + 1]), automesher.max_cellsize_air, 1.3))
+        y= np.append(y, ymin-distance[3])
+        graded_lines_y.extend(meshing_utils.add_graded_mesh_lines(np.min(lines[1]), ymin-distance[3], abs(np.min(lines[1]) - lines[1][np.argmin(lines[1]) + 1]), automesher.max_cellsize_air, 1.3))
     if z_mesh_data and zmax in z_mesh_data:
-        z= np.append(z, zmax+automesher.wave_length)
-        graded_lines_z.extend(meshing_utils.add_graded_mesh_lines(np.max(lines[2][0]), zmax+automesher.wave_length, abs(np.max(lines[2][0])- lines[2][0][np.argmax(lines[2][0]) - 1]), automesher.max_cellsize_air, 1.3))
+        z= np.append(z, zmax+distance[4])
+        graded_lines_z.extend(meshing_utils.add_graded_mesh_lines(np.max(lines[2]), zmax+distance[4], abs(np.max(lines[2])- lines[2][np.argmax(lines[2]) - 1]), automesher.max_cellsize_air, 1.3))
     if z_mesh_data and zmin in z_mesh_data:
-        z= np.append(z, zmin-automesher.wave_length)
-        graded_lines_z.extend(meshing_utils.add_graded_mesh_lines(np.min(lines[2][0]), zmin-automesher.wave_length, abs(np.min(lines[2][0]) - lines[2][0][np.argmin(lines[2][0]) + 1]), automesher.max_cellsize_air, 1.3))
+        z= np.append(z, zmin-distance[5])
+        graded_lines_z.extend(meshing_utils.add_graded_mesh_lines(np.min(lines[2]), zmin-distance[5], abs(np.min(lines[2]) - lines[2][np.argmin(lines[2]) + 1]), automesher.max_cellsize_air, 1.3))
 
     # add  graded lines to lines list
-    lines[0][0] = np.append(lines[0][0], graded_lines_x)
-    lines[1][0] = np.append(lines[1][0], graded_lines_y)
-    lines[2][0] = np.append(lines[2][0], graded_lines_z)
+    lines[0] = np.append(lines[0], graded_lines_x)
+    lines[1] = np.append(lines[1], graded_lines_y)
+    lines[2] = np.append(lines[2], graded_lines_z)
     # add z lines to lines list
-
     z = [(z, None) for z in z]
-    x = [(x, None ) for x in lines[0][0]]
+    x = [(x, None ) for x in lines[0]]
     y = [(y, None) for y in y]
 
-    lines[2][0] = np.unique(lines[2][0])
+    lines[0] = [line for line in lines[0] if x_mesh_data and all(abs(line - x) > 0.1 for x in x_mesh_data)]
+    lines[1] = [line for line in lines[1] if y_mesh_data and all(abs(line - y) > 0.1 for y in y_mesh_data)]
+    lines[2] = [line for line in lines[2] if z_mesh_data and all(abs(line - z) > 0.1 for z in z_mesh_data)]
+
     return lines 

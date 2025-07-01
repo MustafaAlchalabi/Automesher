@@ -87,7 +87,8 @@ global_mesh_setup = {
     'stop_frequency': fstop,
     'mesh_resolution': 'medium',
     'use_circle_detection': True, 
-    # 'refined_cellsize': 10,
+    # 'boundary_distance': ['auto', 'auto', 'auto', 'auto', 'auto', 'auto'], # value, 'auto' or None
+    # 'refined_cellsize': 2,
     # 'min_cellsize': 0.5,
     # 'num_lines': 3,
     # 'max_cellsize': max_cellsize,

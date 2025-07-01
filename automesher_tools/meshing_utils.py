@@ -50,16 +50,17 @@ def get_mesh_parameters(automesher):
             return mesh_res, num_lines
         
         automesher.mesh_res = automesher.global_mesh_setup.get('refined_cellsize', None)
+        # if automesher.mesh_res is not None:
+        #     automesher.mesh_res = automesher.global_mesh_setup.get('mesh_resolution', None)
         if automesher.mesh_res is not None:
-            automesher.mesh_resolution = automesher.global_mesh_setup.get('mesh_resolution', None)
-            if automesher.mesh_resolution is not None:
-                automesher.num_lines = get_mesh_res()[1]
-            else:
-                automesher.num_lines = 5
+            automesher.num_lines = get_mesh_res()[1]
+        else:
+            automesher.num_lines = 5
         if automesher.mesh_res is None:
             automesher.mesh_res, automesher.num_lines = get_mesh_res()
 
         automesher.max_cellsize = automesher.global_mesh_setup.get('max_cellsize', get_mesh_res()[0])    
+        print('automesher.mesh_res:', automesher.mesh_res)
         automesher.min_cellsize = automesher.global_mesh_setup.get('min_cellsize', automesher.mesh_res / 4)
         automesher.max_res = automesher.min_cellsize + 0.25 * automesher.min_cellsize
 
@@ -566,7 +567,7 @@ def add_graded_mesh_lines(start, end, start_res, target_cellsize, growth):
 
     return lines
 
-def add_graded_mesh_lines_at_material_transitions(automesher, edges, mesh_data, mesh_res, mesh_map):
+def add_graded_mesh_lines_at_material_transitions(automesher, edges, mesh_data, mesh_res, mesh_map, direction):
     for i in range(len(edges) - 1):
         if abs(np.diff([edges[i][0], edges[i + 1][0]])) == 0 and edges[i][0] > np.min(edges[0][0]) and edges[i+1][0] < np.max(edges[-1][0]):
             if hasattr(edges[i][3], 'GetProperty') and hasattr(edges[i + 1][3], 'GetProperty'):
@@ -580,24 +581,76 @@ def add_graded_mesh_lines_at_material_transitions(automesher, edges, mesh_data, 
 
                     if hasattr(edges[i][3].GetProperty(),'GetMaterialProperty') and hasattr(edges[i + 1][3].GetProperty(), 'GetMaterialProperty'):
                         if edges[i][3].GetProperty().GetMaterialProperty('epsilon') != edges[i + 1][3].GetProperty().GetMaterialProperty('epsilon'):
-                            lines = add_graded_mesh_lines(edges[i][0], edges[i][0]-mesh_res, automesher.min_cellsize, automesher.max_cellsize, 1.1)
-                            lines = add_graded_mesh_lines(edges[i][0], edges[i][0]+mesh_res, automesher.min_cellsize, automesher.max_cellsize, 1.1)
+                            lines = add_graded_mesh_lines(edges[i][0], edges[i][0]-mesh_res, automesher.min_cellsize, automesher.max_cellsize, 1.3)
+                            lines = add_graded_mesh_lines(edges[i][0], edges[i][0]+mesh_res, automesher.min_cellsize, automesher.max_cellsize, 1.3)
                             mesh_data.extend(lines)
                             
     mesh_map.sort(key=lambda x: x[0])
     for i in range(len(mesh_map)-1):
-        if mesh_map[i][0] < mesh_map[i+1][0] and mesh_map[i][2] != mesh_map[i+1][2]:
+        if direction == 'z':
+            condition  = True
+        else:
+            condition  = (mesh_map[i][8][0] <= mesh_map[i+1][8][0] <= mesh_map[i][8][1] or mesh_map[i][8][0] <= mesh_map[i+1][8][1] <= mesh_map[i][8][1] or mesh_map[i+1] [8][0] <= mesh_map[i][8][0] <= mesh_map[i+1][8][1] or mesh_map[i+1][8][0] <= mesh_map[i][8][1] <= mesh_map[i+1][8][1])
+        if not mesh_data or mesh_map[i][0] <= min(mesh_data):
+            continue
+        if mesh_map[i][0] < mesh_map[i+1][0] and mesh_map[i][2] != mesh_map[i+1][2] and condition:
             target_size = automesher.max_cellsize_air / max(mesh_map[i][2], mesh_map[i+1][2])**0.5
             lines = add_graded_mesh_lines(mesh_map[i+1][0], mesh_map[i+1][0]-mesh_res, automesher.min_cellsize, target_size, 1.3)
             mesh_data.extend(lines)
             lines = add_graded_mesh_lines(mesh_map[i+1][0], mesh_map[i+1][0]+mesh_res, automesher.min_cellsize, target_size, 1.3)
             mesh_data.extend(lines)
-        if mesh_map[i+1][1] < mesh_map[i][1] and mesh_map[i][2] != mesh_map[i+1][2]:
+        if mesh_map[i+1][1] < mesh_map[i][1] and mesh_map[i][2] != mesh_map[i+1][2] and condition:
             target_size = automesher.max_cellsize_air / max(mesh_map[i][2], mesh_map[i+1][2])**0.5
             lines = add_graded_mesh_lines(mesh_map[i+1][1], mesh_map[i+1][1]-mesh_res, automesher.min_cellsize, target_size, 1.3)
             mesh_data.extend(lines)
             lines = add_graded_mesh_lines(mesh_map[i+1][1], mesh_map[i+1][1]+mesh_res, automesher.min_cellsize, target_size, 1.3)
             mesh_data.extend(lines)
+
+    # mesh_map[0] : [start, end, epsilon, prop, x_point, xedges, ypoint, yedges, z_boundaries
+    # mesh_map[1] : [start, end, epsilon, prop, y_point, yedges, xpoint, xedges, z_boundaries
+    # mesh_map[1]: [[np.float64(-9000.0), np.float64(21000.0), 3.66, <CSXCAD.CSProperties.CSPropMaterial object at 0x7f8057985570>, [np.float64(-9000.0), np.float64(-9000.0), np.float64(21000.0), np.float64(21000.0), np.float64(-9000.0)], [[np.float64(-9000.0), np.float64(-50000.0), np.float64(50000.0), <CSXCAD.CSPrimitives.CSPrimBox object at 0x7f8057986590>], [np.float64(21000.0), np.float64(50000.0), np.float64(-50000.0), <CSXCAD.CSPrimitives.CSPrimBox object at 0x7f8057986590>]], [np.float64(-50000.0), np.float64(50000.0), np.float64(50000.0), np.float64(-50000.0), np.float64(-50000.0)], [[np.float64(50000.0), np.float64(-9000.0), np.float64(21000.0), <CSXCAD.CSPrimitives.CSPrimBox object at 0x7f8057986590>], [np.float64(-50000.0), np.float64(21000.0), np.float64(-9000.0), <CSXCAD.CSPrimitives.CSPrimBox object at 0x7f8057986590>]], [0.0, 254.0, 3.66]], [np.float64(-300.0), np.float64(12300.0), 1.0, <CSXCAD.CSProperties.CSPropMetal object at 0x7f8057985870>, [np.float64(300.0), np.float64(300.0), np.float64(12300.0), np.float64(12300.0), np.float64(300.0), np.float64(-300.0), np.float64(-300.0), np.float64(300.0), np.float64(300.0), np.float64(-300.0), np.float64(-300.0), np.float64(-300.0), np.float64(300.0), np.float64(300.0), np.float64(-300.0)], [[np.float64(300.0), np.float64(-300.0), np.float64(300.0), <CSXCAD.CSPrimitives.CSPrimBox object at 0x7f8057985eb0>], [np.float64(12300.0), np.float64(300.0), np.float64(-300.0), <CSXCAD.CSPrimitives.CSPrimBox object at 0x7f8057985eb0>], [np.float64(-300.0), np.float64(-50000.0), np.float64(0.0), <CSXCAD.CSPrimitives.CSPrimBox object at 0x7f8057985530>], [np.float64(300.0), np.float64(0.0), np.float64(-50000.0), <CSXCAD.CSPrimitives.CSPrimBox object at 0x7f8057985530>], [np.float64(-300.0), np.float64(0.0), np.float64(50000.0), <CSXCAD.CSPrimitives.CSPrimBox object at 0x7f8057985830>], [np.float64(300.0), np.float64(50000.0), np.float64(0.0), <CSXCAD.CSPrimitives.CSPrimBox object at 0x7f8057985830>]], [np.float64(-300.0), np.float64(300.0), np.float64(300.0), np.float64(-300.0), np.float64(-300.0), np.float64(-50000.0), np.float64(0.0), np.float64(0.0), np.float64(-50000.0), np.float64(-50000.0), np.float64(0.0), np.float64(50000.0), np.float64(50000.0), np.float64(0.0), np.float64(0.0)], [[np.float64(300.0), np.float64(300.0), np.float64(12300.0), <CSXCAD.CSPrimitives.CSPrimBox object at 0x7f8057985eb0>], [np.float64(-300.0), np.float64(12300.0), np.float64(300.0), <CSXCAD.CSPrimitives.CSPrimBox object at 0x7f8057985eb0>], [np.float64(0.0), np.float64(-300.0), np.float64(300.0), <CSXCAD.CSPrimitives.CSPrimBox object at 0x7f8057985530>], [np.float64(-50000.0), np.float64(300.0), np.float64(-300.0), <CSXCAD.CSPrimitives.CSPrimBox object at 0x7f8057985530>], [np.float64(50000.0), np.float64(-300.0), np.float64(300.0), <CSXCAD.CSPrimitives.CSPrimBox object at 0x7f8057985830>], [np.float64(0.0), np.float64(300.0), np.float64(-300.0), <CSXCAD.CSPrimitives.CSPrimBox object at 0x7f8057985830>]], [254.0, 254.0, 1.0]]]
+    # yline_in_polygon(coords, edges[i][0]+min_distance_x/2, edges[i][1], edges[i][2])
+
+    for mesh_maps in mesh_map:
+        start, end, epsilon, prop, x_point, xedges, ypoint, yedges, z_boundaries = mesh_maps
+        target_size = automesher.max_cellsize_air / mesh_maps[2]**0.5
+        if xedges:
+            xedges.sort(key=lambda x: x[0])
+            for i in range(len(xedges)-1):
+                if not mesh_data or xedges[i][0] <= min(mesh_data):
+                    continue
+                else:
+                    lines = add_graded_mesh_lines(xedges[i][0], xedges[i][0]-mesh_res, automesher.min_cellsize, target_size, 1.3)
+                    if i > 0 and (abs(max(lines)-min(lines)) + target_size >= xedges[i][0] - xedges[i-1][0] or xedges[i][0] - xedges[i-1][0] == 0):
+                        lines_to_remove = [line for line in mesh_data if ((xedges[i-1][0] <= line <= xedges[i][0]) or (xedges[i][0] <= line <= xedges[i-1][0]))]
+                        if lines_to_remove:
+                            for line in lines_to_remove:
+                                if line in mesh_data:
+                                    mesh_data.remove(line)
+                        # equal_lines = np.linspace(xedges[i-1][0], xedges[i][0], automesher.num_lines)
+                        # mesh_data.extend(equal_lines)
+                    
+                    else:   
+                        mesh_data.extend(lines)
+                    lines = add_graded_mesh_lines(xedges[i][0], xedges[i][0]+mesh_res, automesher.min_cellsize, target_size, 1.3)
+                    if abs(max(lines)-min(lines)) + target_size >= xedges[i+1][0] - xedges[i][0] or xedges[i+1][0] - xedges[i][0] == 0:
+                        lines_to_remove = [line for line in mesh_data if ((xedges[i][0] <= line <= xedges[i+1][0]) or (xedges[i+1][0] <= line <= xedges[i][0]))]
+                        if lines_to_remove:
+                            for line in lines_to_remove:
+                                mesh_data.remove(line)    
+                        # equal_lines = np.linspace(xedges[i][0], xedges[i+1][0], automesher.num_lines)
+                        # mesh_data.extend(equal_lines)               
+                    else:
+                        mesh_data.extend(lines)
+
+
+
+
+    
+
+
+
+                    
 
         
         

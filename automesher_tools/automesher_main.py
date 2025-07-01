@@ -65,11 +65,13 @@ class Automesher:
         lines = mesh_processing.process_mesh_lines(self, grid)         
         
         for i in range(3):
-            grid.AddLine(i, lines[i][0])
+            if lines[i]:
+                grid.AddLine(i, lines[i])
         
         # x, y, z = grid.GetLines(0), grid.GetLines(1), grid.GetLines(2)
-        # print('x', min(np.diff(x)))
-        # print('y', min(np.diff(y)))
+        # print('x', min(abs(np.diff(x))))
+        # print('y', min(abs(np.diff(y))))
+        # print('z', min(abs(np.diff(z))))
 
 
     def collect_mesh_data_for_multiple_primitives(self, primitives, **kw):
@@ -98,6 +100,9 @@ class Automesher:
         x_coords, y_coords, z_coords = [], [], []
 
         def get_mesh_map():
+            '''
+            Returns a list containing x, y, and z boundaries with their respective properties.
+            '''
             properties= self.csx.GetAllProperties()
             mesh_map = [[], [], []]  # x, y, z boundaries
             for prop in properties:
@@ -126,9 +131,9 @@ class Automesher:
                             tmp_z.extend(geometry_utils.collect_z_coordinates([primitives]))
                         tmp_z = [(z[0]) for z in tmp_z]
 
-                        z_boundaries = [min(tmp_z), max(tmp_z), epsilon]
-                        x_boundaries = [min(tmp_x), max(tmp_x), epsilon, prop, z_boundaries]
-                        y_boundaries = [min(tmp_y), max(tmp_y), epsilon, prop, z_boundaries]
+                        z_boundaries = [min(tmp_z), max(tmp_z), epsilon, prop, None, None, None, None, None]
+                        x_boundaries = [min(tmp_x), max(tmp_x), epsilon, prop, tmp_x, tmp_x_edges, tmp_y, tmp_y_edges, z_boundaries]
+                        y_boundaries = [min(tmp_y), max(tmp_y), epsilon, prop, tmp_y, tmp_y_edges, tmp_x, tmp_x_edges, z_boundaries]
                         mesh_map[0].extend([x_boundaries])
                         mesh_map[1].extend([y_boundaries])
                         mesh_map[2].extend([z_boundaries])
@@ -136,7 +141,6 @@ class Automesher:
             return mesh_map
         
         mesh_map = get_mesh_map()
-        print(f"Mesh map: {mesh_map}")
 
         geometry_utils.process_polygon(self, polygon, x_coords, y_coords, z_coords, x_edges, y_edges, diagonal_edges, mesh_data)
         # Get the mesh parameters
@@ -146,6 +150,16 @@ class Automesher:
         unique_xedges, unique_yedges = geometry_utils.get_unique_edges(x_edges), geometry_utils.get_unique_edges(y_edges)
 
         meshing_utils.adjust_mesh_parameters(self, unique_xedges, unique_yedges, diagonal_edges, mesh_data)
+
+        # Sort edges by their starting coordinates
+        x_edges.sort(key=lambda edge: edge[0])
+        y_edges.sort(key=lambda edge: edge[0]) 
+
+        # Add graded meshlines at material transitions
+        meshing_utils.add_graded_mesh_lines_at_material_transitions(self, x_edges,mesh_data[0], self.mesh_res, mesh_map[0],'x')
+        meshing_utils.add_graded_mesh_lines_at_material_transitions(self, y_edges,mesh_data[1], self.mesh_res, mesh_map[1],'y')
+        z_coords = [(z[0], None, None, z[1]) for z in z_coords]
+        meshing_utils.add_graded_mesh_lines_at_material_transitions(self, z_coords,mesh_data[2], self.mesh_res, mesh_map[2],'z')
 
         # Handle diagonal edges and add mesh lines for x and y directions
         meshing_utils.handle_otheredges(self, diagonal_edges, unique_xedges, unique_yedges, self.mesh_res, self.max_res, mesh_data[0], 'x')
@@ -173,12 +187,6 @@ class Automesher:
         # Add edges to the mesh mesh_data for x and y directions
         meshing_utils.add_edges_to_mesh_mesh_data(self, mesh_data[0], x_edges, self.mesh_res, self.min_cellsize, 'x')
         meshing_utils.add_edges_to_mesh_mesh_data(self, mesh_data[1], y_edges, self.mesh_res, self.min_cellsize, 'y')
-
-        # Add graded meshlines at material transitions
-        meshing_utils.add_graded_mesh_lines_at_material_transitions(self, x_edges,mesh_data[0], self.mesh_res, mesh_map[0])
-        meshing_utils.add_graded_mesh_lines_at_material_transitions(self, y_edges,mesh_data[1], self.mesh_res, mesh_map[1])
-        z_coords = [(z[0], None, None, z[1]) for z in z_coords]
-        # meshing_utils.add_graded_mesh_lines_at_material_transitions(self, z_coords,mesh_data[2], self.mesh_res, mesh_map[2])
 
         # Handle circular segments in the polygon
         self.found_circles = geometry_utils.detect_all_circles_in_polygon(self, polygon)
