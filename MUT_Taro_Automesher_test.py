@@ -15,13 +15,8 @@ from automesher_tools.automesher_main import GenerateMesh, enhance_csx_for_auto_
 Sim_Path = os.path.realpath(os.path.join('.', 'MUT_Taro'))
 
 
-<<<<<<< HEAD
 post_proc_only = True
 preview_only = False
-=======
-post_proc_only = False
-preview_only = True
->>>>>>> febb401f798cde0c3b3b5303f6c752d5446b45c4
 
 unit = 1e-6
 
